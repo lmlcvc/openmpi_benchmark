@@ -2,10 +2,11 @@
 #include <iomanip>
 #include <mpi.h>
 #include <chrono>
+#include <cstring>
 
-const std::size_t MESSAGE_SIZE = 1000000;
-const std::size_t NUM_ROUND_TRIPS = 10;
-const double INTERVAL_MS = 50.0;
+std::size_t message_size = 1000000;
+std::size_t num_round_trips = 10;
+double interval_ms = 50.0;
 
 void perform_rt_communication(uint32_t *message, uint8_t rank) {
     MPI_Datatype mpi_uint32_t;
@@ -13,11 +14,11 @@ void perform_rt_communication(uint32_t *message, uint8_t rank) {
     MPI_Type_commit(&mpi_uint32_t);
 
     if (rank == 0) {
-        MPI_Send(message, MESSAGE_SIZE, mpi_uint32_t, 1, 0, MPI_COMM_WORLD);
-        MPI_Recv(message, MESSAGE_SIZE, mpi_uint32_t, 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Send(message, message_size, mpi_uint32_t, 1, 0, MPI_COMM_WORLD);
+        MPI_Recv(message, message_size, mpi_uint32_t, 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     } else if (rank == 1) {
-        MPI_Recv(message, MESSAGE_SIZE, mpi_uint32_t, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        MPI_Send(message, MESSAGE_SIZE, mpi_uint32_t, 0, 0, MPI_COMM_WORLD);
+        MPI_Recv(message, message_size, mpi_uint32_t, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Send(message, message_size, mpi_uint32_t, 0, 0, MPI_COMM_WORLD);
     }
 
     MPI_Type_free(&mpi_uint32_t);
@@ -41,12 +42,22 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    // Process command-line arguments
+    for (int i = 1; i < argc; i++) {
+        if (std::strcmp(argv[i], "--message-size") == 0 && i + 1 < argc) {
+            message_size = std::stoul(argv[i + 1]);
+        } else if (std::strcmp(argv[i], "--num-round-trips") == 0 && i + 1 < argc) {
+            num_round_trips = std::stoul(argv[i + 1]);
+        } else if (std::strcmp(argv[i], "--interval") == 0 && i + 1 < argc) {
+            interval_ms = std::stod(argv[i + 1]);
+        }
+    }
+
     // Initialize message and data
-    message = new uint32_t[MESSAGE_SIZE];
-    for (std::size_t i = 0; i < MESSAGE_SIZE; i++) {
+    message = new uint32_t[message_size];
+    for (std::size_t i = 0; i < message_size; i++) {
         message[i] = i;
     }
-    std::cout << "Message Size: " << static_cast<double>(MESSAGE_SIZE * sizeof(uint32_t) / 1024) << " kB" << std::endl;
 
     // Warmup round
     perform_rt_communication(message, rank);
@@ -59,18 +70,18 @@ int main(int argc, char **argv) {
     std::size_t total_bytes = 0;
     double total_rtt = 0.0;
 
-    while (elapsed_ms < NUM_ROUND_TRIPS * INTERVAL_MS) {
+    while (elapsed_ms < num_round_trips * interval_ms) {
         double current_time = MPI_Wtime();
         elapsed_time = current_time - start_time;
         elapsed_ms = elapsed_time * 1000.0;
 
-        if (elapsed_ms >= (round_trip + 1) * INTERVAL_MS) {
+        if (elapsed_ms >= (round_trip + 1) * interval_ms) {
             double rt_start_time = MPI_Wtime();
             perform_rt_communication(message, rank);
             double rt_end_time = MPI_Wtime();
             double rtt = rt_end_time - rt_start_time;
 
-            total_bytes += MESSAGE_SIZE * sizeof(uint32_t);
+            total_bytes += message_size * sizeof(uint32_t);
             total_rtt += rtt;
 
             if (rank == 0) {
