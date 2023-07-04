@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
 
     if (rank == 0) {
         std::cout << "Elapsed time: " << elapsed_time << " s" << std::endl;
-        double elapsed_throughput = (double) (2 * MESSAGE_SIZE * sizeof(uint32_t)) / (1024 * 1024 * elapsed_time);
+        double elapsed_throughput = (double) (MESSAGE_SIZE * sizeof(uint32_t)) / (1024 * 1024 * elapsed_time);
         std::cout << "Elapsed Throughput: " << elapsed_throughput << " MB/s" << std::endl;
     }
 
