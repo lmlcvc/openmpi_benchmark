@@ -5,17 +5,21 @@
 const std::size_t MESSAGE_SIZE = 1000000;
 const std::size_t NUM_ROUND_TRIPS = 5;
 
-
 void perform_rt_communication(uint32_t *message, uint8_t rank) {
-    if (rank == 0) {
-        MPI_Send(message, MESSAGE_SIZE, MPI_UINT32_T, 1, 0, MPI_COMM_WORLD);
-        MPI_Recv(message, MESSAGE_SIZE, MPI_UINT32_T, 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    } else if (rank == 1) {
-        MPI_Recv(message, MESSAGE_SIZE, MPI_UINT32_T, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        MPI_Send(message, MESSAGE_SIZE, MPI_UINT32_T, 0, 0, MPI_COMM_WORLD);
-    }
-}
+    MPI_Datatype mpi_uint32_t;
+    MPI_Type_contiguous(sizeof(uint32_t), MPI_BYTE, &mpi_uint32_t);
+    MPI_Type_commit(&mpi_uint32_t);
 
+    if (rank == 0) {
+        MPI_Send(message, MESSAGE_SIZE, mpi_uint32_t, 1, 0, MPI_COMM_WORLD);
+        MPI_Recv(message, MESSAGE_SIZE, mpi_uint32_t, 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    } else if (rank == 1) {
+        MPI_Recv(message, MESSAGE_SIZE, mpi_uint32_t, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Send(message, MESSAGE_SIZE, mpi_uint32_t, 0, 0, MPI_COMM_WORLD);
+    }
+
+    MPI_Type_free(&mpi_uint32_t);
+}
 
 int main(int argc, char **argv) {
     int rank;
