@@ -5,6 +5,18 @@
 const std::size_t MESSAGE_SIZE = 1000000;
 const std::size_t NUM_ROUND_TRIPS = 5;
 
+
+void perform_rt_communication(uint32_t *message, uint8_t rank) {
+    if (rank == 0) {
+        MPI_Send(message, MESSAGE_SIZE, MPI_UINT32_T, 1, 0, MPI_COMM_WORLD);
+        MPI_Recv(message, MESSAGE_SIZE, MPI_UINT32_T, 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    } else if (rank == 1) {
+        MPI_Recv(message, MESSAGE_SIZE, MPI_UINT32_T, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Send(message, MESSAGE_SIZE, MPI_UINT32_T, 0, 0, MPI_COMM_WORLD);
+    }
+}
+
+
 int main(int argc, char **argv) {
     int rank;
     int size;
@@ -30,29 +42,18 @@ int main(int argc, char **argv) {
     }
 
     // Warmup round
-    if (rank == 0) {
-        MPI_Send(message, MESSAGE_SIZE, MPI_UINT32_T, 1, 0, MPI_COMM_WORLD);
-        MPI_Recv(message, MESSAGE_SIZE, MPI_UINT32_T, 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    } else if (rank == 1) {
-        MPI_Recv(message, MESSAGE_SIZE, MPI_UINT32_T, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        MPI_Send(message, MESSAGE_SIZE, MPI_UINT32_T, 0, 0, MPI_COMM_WORLD);
-    }
+    perform_rt_communication(message, rank);
 
     // Measure elapsed time
     start_time = MPI_Wtime();
     for (std::size_t i = 0; i < NUM_ROUND_TRIPS; i++) {
+        perform_rt_communication(message, rank);
         if (rank == 0) {
-            MPI_Send(message, MESSAGE_SIZE, MPI_UINT32_T, 1, 0, MPI_COMM_WORLD);
-            MPI_Recv(message, MESSAGE_SIZE, MPI_UINT32_T, 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
             double rtt = MPI_Wtime() - start_time;
             double rtt_throughput = (double) (MESSAGE_SIZE * sizeof(uint32_t)) / (1024 * 1024 * rtt);
 
             std::cout << "Round Trip " << i + 1 << " - RTT: " << rtt << " s | Throughput: " << rtt_throughput << " MB/s"
                       << std::endl;
-        } else if (rank == 1) {
-            MPI_Recv(message, MESSAGE_SIZE, MPI_UINT32_T, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            MPI_Send(message, MESSAGE_SIZE, MPI_UINT32_T, 0, 0, MPI_COMM_WORLD);
         }
     }
     end_time = MPI_Wtime();
