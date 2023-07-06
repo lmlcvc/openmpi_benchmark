@@ -9,7 +9,17 @@ std::size_t chunk_size = 1000;
 std::size_t num_round_trips = 10;
 double interval_ms = 50.0;
 
-void perform_rt_communication(uint32_t* message, uint8_t rank) {
+// TODO is it better practice to keep these things in functions or in code, bc of overhead
+void print_chunk_info(uint8_t rank, std::size_t chunk, double rtt, double chunk_throughput) {
+    if (rank == 0) {
+        std::cout << "Chunk " << std::setw(2) << chunk
+                  << " | Time: " << std::fixed << std::setprecision(6) << rtt
+                  << " ms | Throughput: " << std::fixed << std::setprecision(2) << chunk_throughput
+                  << " Mbit/s" << std::endl;
+    }
+}
+
+void perform_rt_communication(uint32_t *message, uint8_t rank, bool print_enabled = true) {
     MPI_Datatype mpi_uint32_t;
     MPI_Type_contiguous(sizeof(uint32_t), MPI_BYTE, &mpi_uint32_t);
     MPI_Type_commit(&mpi_uint32_t);
@@ -17,23 +27,19 @@ void perform_rt_communication(uint32_t* message, uint8_t rank) {
     std::size_t num_chunks = message_size / chunk_size;
     std::size_t remaining_elements = message_size % chunk_size;
 
-    for (std::size_t chunk = 0; chunk < num_chunks; chunk++) {
-        std::size_t offset = chunk * chunk_size;
+    for (std::size_t chunk = 1; chunk <= num_chunks; chunk++) {
+        std::size_t offset = (chunk - 1) * chunk_size;
         double start_time = MPI_Wtime();
 
         MPI_Send(&message[offset], chunk_size, mpi_uint32_t, 1 - rank, 0, MPI_COMM_WORLD);
         MPI_Recv(&message[offset], chunk_size, mpi_uint32_t, 1 - rank, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-        double end_time = MPI_Wtime();
+        if (print_enabled) {
+            double end_time = MPI_Wtime();
+            double rtt = end_time - start_time;
+            double chunk_throughput = static_cast<double>(chunk_size * sizeof(uint32_t)) / (rtt * 1000 * 1000 * 8);
 
-        double rtt = end_time - start_time;
-        double rtt_throughput = static_cast<double>(chunk_size * sizeof(uint32_t)) / (rtt * 1024 * 1024 * 8);
-
-        if (rank == 0) {
-            std::cout << "Chunk " << chunk + 1
-                      << " | RTT: " << std::fixed << std::setprecision(6) << rtt
-                      << " ms | Throughput: " << std::fixed << std::setprecision(2) << rtt_throughput
-                      << " Mbps" << std::endl;
+            print_chunk_info(rank, chunk, rtt, chunk_throughput);
         }
     }
 
@@ -42,30 +48,25 @@ void perform_rt_communication(uint32_t* message, uint8_t rank) {
     // Pad remaining elements with 0s
     if (remaining_elements > 0) {
         std::fill(&message[offset], &message[offset + remaining_elements], 0);
-    }
+        double start_time = MPI_Wtime();
+        MPI_Send(&message[offset], remaining_elements, mpi_uint32_t, 1 - rank, 0, MPI_COMM_WORLD);
+        MPI_Recv(&message[offset], remaining_elements, mpi_uint32_t, 1 - rank, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        double end_time = MPI_Wtime();
 
-    double start_time = MPI_Wtime();
-    MPI_Send(&message[offset], chunk_size, mpi_uint32_t, 1 - rank, 0, MPI_COMM_WORLD);
-    MPI_Recv(&message[offset], chunk_size, mpi_uint32_t, 1 - rank, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    double end_time = MPI_Wtime();
-
-    double rtt = end_time - start_time;
-    double rtt_throughput = static_cast<double>(chunk_size * sizeof(uint32_t)) / (rtt * 1024 * 1024 * 8);
-
-    if (rank == 0) {
-        std::cout << "Chunk " << num_chunks + 1
-                  << " | RTT: " << std::fixed << std::setprecision(6) << rtt
-                  << " ms | Throughput: " << std::fixed << std::setprecision(2) << rtt_throughput
-                  << " Mbps" << std::endl;
+        if (print_enabled) {
+            double rtt = end_time - start_time;
+            double chunk_throughput = static_cast<double>(remaining_elements * sizeof(uint32_t)) / (rtt * 1000 * 1000 * 8);
+            print_chunk_info(rank, num_chunks + 1, rtt, chunk_throughput);
+        }
     }
 
     MPI_Type_free(&mpi_uint32_t);
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
     int rank;
     int size;
-    uint32_t* message;
+    uint32_t *message;
     double start_time, end_time, elapsed_time;
 
     MPI_Init(&argc, &argv);
@@ -100,7 +101,7 @@ int main(int argc, char** argv) {
     }
 
     // Warmup round
-    perform_rt_communication(message, rank);
+    perform_rt_communication(message, rank, false);
 
     // Measure elapsed time
     start_time = MPI_Wtime();
@@ -129,10 +130,8 @@ int main(int argc, char** argv) {
                 double avg_throughput = (rtt_throughput * (round_trip + 1)) / (round_trip + 2);
 
                 std::cout << "Round Trip " << round_trip + 1
-                          << " | RTT: " << std::fixed << std::setprecision(6) << rtt
-                          << " ms | Throughput: " << std::fixed << std::setprecision(2) << rtt_throughput
-                          << " Mbps | Average Throughput: " << std::fixed << std::setprecision(2) << avg_throughput
-                          << " Mbps" << std::endl;
+                          << " | Total RTT: " << std::fixed << std::setprecision(6) << rtt
+                          << " ms " << std::endl << "\t---------------------" << std::endl;
 
                 round_trip++;
             }
