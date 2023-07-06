@@ -27,14 +27,20 @@ void perform_rt_communication(uint32_t *message, uint8_t rank, bool print_enable
     std::size_t num_chunks = message_size / chunk_size;
     std::size_t remaining_elements = message_size % chunk_size;
 
-    for (std::size_t chunk = 1; chunk <= num_chunks; chunk++) {
-        std::size_t offset = (chunk - 1) * chunk_size;
+    for (std::size_t chunk = 0; chunk < num_chunks; chunk++) {
+        std::size_t offset = chunk * chunk_size;
         double start_time = MPI_Wtime();
 
-        MPI_Send(&message[offset], chunk_size, mpi_uint32_t, 1 - rank, 0, MPI_COMM_WORLD);
-        MPI_Recv(&message[offset], chunk_size, mpi_uint32_t, 1 - rank, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Request send_request, recv_request;
+        MPI_Isend(&message[offset], chunk_size, mpi_uint32_t, 1 - rank, 0, MPI_COMM_WORLD, &send_request);
+        MPI_Irecv(&message[offset], chunk_size, mpi_uint32_t, 1 - rank, 0, MPI_COMM_WORLD, &recv_request);
 
-        if (print_enabled) {
+        // Wait for communication to complete
+        MPI_Wait(&send_request, MPI_STATUS_IGNORE);
+        MPI_Wait(&recv_request, MPI_STATUS_IGNORE);
+
+        // Print chunk information (if needed)
+        if (rank == 0 && print_enabled) {
             double end_time = MPI_Wtime();
             double rtt = end_time - start_time;
             double chunk_throughput = static_cast<double>(chunk_size * sizeof(uint32_t)) / (rtt * 1000 * 1000 * 8);
@@ -45,17 +51,26 @@ void perform_rt_communication(uint32_t *message, uint8_t rank, bool print_enable
 
     std::size_t offset = num_chunks * chunk_size;
 
-    // Pad remaining elements with 0s
+    // Pad remaining elements with 0s and send last chunk
     if (remaining_elements > 0) {
         std::fill(&message[offset], &message[offset + remaining_elements], 0);
-        double start_time = MPI_Wtime();
-        MPI_Send(&message[offset], remaining_elements, mpi_uint32_t, 1 - rank, 0, MPI_COMM_WORLD);
-        MPI_Recv(&message[offset], remaining_elements, mpi_uint32_t, 1 - rank, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        double end_time = MPI_Wtime();
 
-        if (print_enabled) {
+        double start_time = MPI_Wtime();
+
+        MPI_Request send_request, recv_request;
+        MPI_Isend(&message[offset], chunk_size, mpi_uint32_t, 1 - rank, 0, MPI_COMM_WORLD, &send_request);
+        MPI_Irecv(&message[offset], chunk_size, mpi_uint32_t, 1 - rank, 0, MPI_COMM_WORLD, &recv_request);
+
+        // Wait for communication to complete
+        MPI_Wait(&send_request, MPI_STATUS_IGNORE);
+        MPI_Wait(&recv_request, MPI_STATUS_IGNORE);
+
+        // Print remaining chunk information (if needed)
+        if (rank == 0 && print_enabled) {
+            double end_time = MPI_Wtime();
             double rtt = end_time - start_time;
-            double chunk_throughput = static_cast<double>(remaining_elements * sizeof(uint32_t)) / (rtt * 1000 * 1000 * 8);
+            double chunk_throughput = static_cast<double>(chunk_size * sizeof(uint32_t)) / (rtt * 1000 * 1000 * 8);
+
             print_chunk_info(rank, num_chunks + 1, rtt, chunk_throughput);
         }
     }
