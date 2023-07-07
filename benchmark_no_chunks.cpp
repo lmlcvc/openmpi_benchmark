@@ -1,27 +1,49 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <iostream>
 #include <mpi.h>
 #include <chrono>
 
-const std::size_t MESSAGE_SIZE = 1000000;
-const std::size_t NUM_ROUND_TRIPS = 5;
 
+void perform_rt_communication(uint32_t *message, std::size_t message_size, std::size_t round_trip,
+                              int8_t rank, bool print_enabled = true) {
+    double start_time = MPI_Wtime();
 
-void perform_rt_communication(uint32_t *message, uint8_t rank) {
-    if (rank == 0) {
-        MPI_Send(message, MESSAGE_SIZE, MPI_UINT32_T, 1, 0, MPI_COMM_WORLD);
-        MPI_Recv(message, MESSAGE_SIZE, MPI_UINT32_T, 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    } else if (rank == 1) {
-        MPI_Recv(message, MESSAGE_SIZE, MPI_UINT32_T, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        MPI_Send(message, MESSAGE_SIZE, MPI_UINT32_T, 0, 0, MPI_COMM_WORLD);
+    MPI_Request send_request, recv_request;
+    MPI_Isend(&message, message_size * sizeof(uint32_t), MPI_BYTE, 1 - rank, 0, MPI_COMM_WORLD,
+              &send_request);
+    MPI_Irecv(&message, message_size * sizeof(uint32_t), MPI_BYTE, 1 - rank, 0, MPI_COMM_WORLD,
+              &recv_request);
+
+    // Wait for communication to complete
+    MPI_Wait(&send_request, MPI_STATUS_IGNORE);
+    MPI_Wait(&recv_request, MPI_STATUS_IGNORE);
+
+    // Print message information
+    if (rank == 0 && print_enabled) {
+        double rtt = MPI_Wtime() - start_time;
+        double rtt_throughput = (2.0 * message_size * sizeof(uint32_t)) / (rtt * 1000 * 1000 * 8);
+
+        std::cout << "Round Trip " << round_trip
+                << " - RTT: " << rtt
+                << " s | Throughput: " << rtt_throughput << " Mbit/s"
+                << std::endl;
     }
+
 }
 
 
 int main(int argc, char **argv) {
-    int rank;
-    int size;
+    int rank, size;
     uint32_t *message;
     double start_time, end_time, elapsed_time;
+
+    int opt;
+    std::size_t message_size = 1000000;
+    double interval_ms = 100.0;
+
+    bool running = true;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -35,35 +57,58 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    // Process command line arguments
+    while ((opt = getopt(argc, argv, "m:i:")) != -1) {
+        switch (opt) {
+            case 'm':
+                message_size = std::stoi(optarg);
+                break;
+            case 'i':
+                interval_ms = std::stoi(optarg);
+                break;
+            default:
+                std::cerr << "Usage: " << argv[0]
+                          << " -m <message-size> -i <interval-ms>" << std::endl;
+                return 1;
+        }
+    }
+
     // Initialize message and data
-    message = new uint32_t[MESSAGE_SIZE];
-    for (std::size_t i = 0; i < MESSAGE_SIZE; i++) {
+    message = new uint32_t[message_size];
+    for (std::size_t i = 0; i < message_size; i++) {
         message[i] = i;
     }
 
     // Warmup round
-    perform_rt_communication(message, rank);
+    perform_rt_communication(message, message_size, -1, rank);
 
-    // Measure elapsed time
+    // Continuous communication run
+    std::size_t round_trip = 1;
     start_time = MPI_Wtime();
-    for (std::size_t i = 0; i < NUM_ROUND_TRIPS; i++) {
-        perform_rt_communication(message, rank);
-        if (rank == 0) {
-            double rtt = MPI_Wtime() - start_time;
-            double rtt_throughput = (double) (MESSAGE_SIZE * sizeof(uint32_t)) / (1024 * 1024 * rtt);
+    double current_time;
 
-            std::cout << "Round Trip " << i + 1 << " - RTT: " << rtt << " s | Throughput: " << rtt_throughput << " MB/s"
-                      << std::endl;
+    while (running) {
+        // handle overflow
+        if (round_trip == 0) start_time = MPI_Wtime();
+        current_time = MPI_Wtime();
+        elapsed_time = current_time - start_time;
+
+        // perform RT communication and measurements
+        if (elapsed_time * 1000 >= round_trip * interval_ms) {
+            perform_rt_communication(message, message_size, round_trip, rank);
         }
+
+        // exit on q
+        // FIXME if (kbhit())  running = false;
+
+        round_trip++;
     }
+
     end_time = MPI_Wtime();
     elapsed_time = end_time - start_time;
 
-    if (rank == 0) {
+    if (rank == 0)
         std::cout << "Elapsed time: " << elapsed_time << " s" << std::endl;
-        double elapsed_throughput = (double) (MESSAGE_SIZE * sizeof(uint32_t)) / (1024 * 1024 * elapsed_time);
-        std::cout << "Elapsed Throughput: " << elapsed_throughput << " MB/s" << std::endl;
-    }
 
     // Free allocated memory and finalize
     delete[] message;
