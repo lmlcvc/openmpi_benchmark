@@ -1,18 +1,12 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <iostream>
 #include <iomanip>
 #include <mpi.h>
 #include <chrono>
 #include <cstring>
 
-// TODO run old code w/o chunks across 2 nodes
-
-// TODO https://www.man7.org/linux/man-pages/man3/getopt.3.html
-
-
-std::size_t message_size = 1000000;
-std::size_t chunk_size = 1000;
-std::size_t num_round_trips = 10;
-double interval_ms = 50.0;
 
 void print_chunk_info(uint8_t rank, std::size_t chunk, double rtt, double chunk_throughput) {
     if (rank == 0) {
@@ -23,7 +17,8 @@ void print_chunk_info(uint8_t rank, std::size_t chunk, double rtt, double chunk_
     }
 }
 
-void perform_rt_communication(uint32_t *message, uint8_t rank, bool print_enabled = true) {
+void perform_rt_communication(uint32_t *message, std::size_t message_size, std::size_t chunk_size,
+                              int8_t rank, bool print_enabled = true) {
     std::size_t num_chunks = message_size / chunk_size;
     std::size_t remaining_elements = message_size % chunk_size;
 
@@ -32,8 +27,10 @@ void perform_rt_communication(uint32_t *message, uint8_t rank, bool print_enable
         double start_time = MPI_Wtime();
 
         MPI_Request send_request, recv_request;
-        MPI_Isend(&message[offset], chunk_size * sizeof(uint32_t), MPI_BYTE, 1 - rank, 0, MPI_COMM_WORLD, &send_request);
-        MPI_Irecv(&message[offset], chunk_size * sizeof(uint32_t), MPI_BYTE, 1 - rank, 0, MPI_COMM_WORLD, &recv_request);
+        MPI_Isend(&message[offset], chunk_size * sizeof(uint32_t), MPI_BYTE, 1 - rank, 0, MPI_COMM_WORLD,
+                  &send_request);
+        MPI_Irecv(&message[offset], chunk_size * sizeof(uint32_t), MPI_BYTE, 1 - rank, 0, MPI_COMM_WORLD,
+                  &recv_request);
 
         // Wait for communication to complete
         MPI_Wait(&send_request, MPI_STATUS_IGNORE);
@@ -55,8 +52,10 @@ void perform_rt_communication(uint32_t *message, uint8_t rank, bool print_enable
         double start_time = MPI_Wtime();
 
         MPI_Request send_request, recv_request;
-        MPI_Isend(&message[offset], remaining_elements * sizeof(uint32_t), MPI_BYTE, 1 - rank, 0, MPI_COMM_WORLD, &send_request);
-        MPI_Irecv(&message[offset], remaining_elements * sizeof(uint32_t), MPI_BYTE, 1 - rank, 0, MPI_COMM_WORLD, &recv_request);
+        MPI_Isend(&message[offset], remaining_elements * sizeof(uint32_t), MPI_BYTE, 1 - rank, 0, MPI_COMM_WORLD,
+                  &send_request);
+        MPI_Irecv(&message[offset], remaining_elements * sizeof(uint32_t), MPI_BYTE, 1 - rank, 0, MPI_COMM_WORLD,
+                  &recv_request);
 
         MPI_Wait(&send_request, MPI_STATUS_IGNORE);
         MPI_Wait(&recv_request, MPI_STATUS_IGNORE);
@@ -72,10 +71,13 @@ void perform_rt_communication(uint32_t *message, uint8_t rank, bool print_enable
 }
 
 int main(int argc, char **argv) {
-    int rank;
-    int size;
+    int rank, size;
     uint32_t *message;
     double start_time, elapsed_time;
+
+    int opt;
+    std::size_t message_size = 1000000, chunk_size = 1000, num_round_trips = 10;
+    double interval_ms = 100.0;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -89,16 +91,25 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    // Process command-line arguments
-    for (int i = 1; i < argc; i++) {
-        if (std::strcmp(argv[i], "--message-size") == 0 && i + 1 < argc) {
-            message_size = std::stoul(argv[i + 1]);
-        } else if (std::strcmp(argv[i], "--chunk-size") == 0 && i + 1 < argc) {
-            chunk_size = std::stoul(argv[i + 1]);
-        } else if (std::strcmp(argv[i], "--num-round-trips") == 0 && i + 1 < argc) {
-            num_round_trips = std::stoul(argv[i + 1]);
-        } else if (std::strcmp(argv[i], "--interval") == 0 && i + 1 < argc) {
-            interval_ms = std::stod(argv[i + 1]);
+    // Process command line arguments
+    while ((opt = getopt(argc, argv, "m:c:n:i:")) != -1) {
+        switch (opt) {
+            case 'm':
+                message_size = std::stoi(optarg);
+                break;
+            case 'c':
+                chunk_size = std::stoi(optarg);
+                break;
+            case 'n':
+                num_round_trips = std::stoi(optarg);
+                break;
+            case 'i':
+                interval_ms = std::stoi(optarg);
+                break;
+            default:
+                std::cerr << "Usage: " << argv[0]
+                          << " -m <message-size> -c <chunk-size> -n <num-round-trips> -i <interval-ms>" << std::endl;
+                return 1;
         }
     }
 
@@ -109,7 +120,7 @@ int main(int argc, char **argv) {
     }
 
     // Warmup round
-    perform_rt_communication(message, rank, false);
+    perform_rt_communication(message, message_size, chunk_size, rank, false);
 
     // Measure elapsed time
     start_time = MPI_Wtime();
@@ -124,14 +135,14 @@ int main(int argc, char **argv) {
 
         if (elapsed_ms >= (round_trip + 1) * interval_ms) {
             double rt_start_time = MPI_Wtime();
-            perform_rt_communication(message, rank);
+            perform_rt_communication(message, message_size, chunk_size, rank);
             double rt_end_time = MPI_Wtime();
             double rtt = rt_end_time - rt_start_time;
 
             if (rank == 0) {
                 std::cout << "Round Trip " << round_trip + 1
-                        << " | Total RTT: " << std::fixed << std::setprecision(8) << rtt
-                        << " ms " << std::endl << "\t---------------------" << std::endl;
+                          << " | Total RTT: " << std::fixed << std::setprecision(8) << rtt
+                          << " ms " << std::endl << "\t---------------------" << std::endl;
 
                 round_trip++;
             }
