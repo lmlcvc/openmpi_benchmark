@@ -4,12 +4,16 @@
 #include <chrono>
 #include <cstring>
 
+// TODO run old code w/o chunks across 2 nodes
+
+// TODO https://www.man7.org/linux/man-pages/man3/getopt.3.html
+
+
 std::size_t message_size = 1000000;
 std::size_t chunk_size = 1000;
 std::size_t num_round_trips = 10;
 double interval_ms = 50.0;
 
-// TODO is it better practice to keep these things in functions or in code, bc of overhead
 void print_chunk_info(uint8_t rank, std::size_t chunk, double rtt, double chunk_throughput) {
     if (rank == 0) {
         std::cout << "Chunk " << std::setw(2) << chunk
@@ -20,10 +24,6 @@ void print_chunk_info(uint8_t rank, std::size_t chunk, double rtt, double chunk_
 }
 
 void perform_rt_communication(uint32_t *message, uint8_t rank, bool print_enabled = true) {
-    MPI_Datatype mpi_uint32_t;
-    MPI_Type_contiguous(sizeof(uint32_t), MPI_BYTE, &mpi_uint32_t);
-    MPI_Type_commit(&mpi_uint32_t);
-
     std::size_t num_chunks = message_size / chunk_size;
     std::size_t remaining_elements = message_size % chunk_size;
 
@@ -32,8 +32,8 @@ void perform_rt_communication(uint32_t *message, uint8_t rank, bool print_enable
         double start_time = MPI_Wtime();
 
         MPI_Request send_request, recv_request;
-        MPI_Isend(&message[offset], chunk_size, mpi_uint32_t, 1 - rank, 0, MPI_COMM_WORLD, &send_request);
-        MPI_Irecv(&message[offset], chunk_size, mpi_uint32_t, 1 - rank, 0, MPI_COMM_WORLD, &recv_request);
+        MPI_Isend(&message[offset], chunk_size * sizeof(uint32_t), MPI_BYTE, 1 - rank, 0, MPI_COMM_WORLD, &send_request);
+        MPI_Irecv(&message[offset], chunk_size * sizeof(uint32_t), MPI_BYTE, 1 - rank, 0, MPI_COMM_WORLD, &recv_request);
 
         // Wait for communication to complete
         MPI_Wait(&send_request, MPI_STATUS_IGNORE);
@@ -51,31 +51,24 @@ void perform_rt_communication(uint32_t *message, uint8_t rank, bool print_enable
 
     std::size_t offset = num_chunks * chunk_size;
 
-    // Pad remaining elements with 0s and send last chunk
-    if (remaining_elements > 0) {
-        std::fill(&message[offset], &message[offset + remaining_elements], 0);
-
+    if (remaining_elements) {
         double start_time = MPI_Wtime();
 
         MPI_Request send_request, recv_request;
-        MPI_Isend(&message[offset], chunk_size, mpi_uint32_t, 1 - rank, 0, MPI_COMM_WORLD, &send_request);
-        MPI_Irecv(&message[offset], chunk_size, mpi_uint32_t, 1 - rank, 0, MPI_COMM_WORLD, &recv_request);
+        MPI_Isend(&message[offset], remaining_elements * sizeof(uint32_t), MPI_BYTE, 1 - rank, 0, MPI_COMM_WORLD, &send_request);
+        MPI_Irecv(&message[offset], remaining_elements * sizeof(uint32_t), MPI_BYTE, 1 - rank, 0, MPI_COMM_WORLD, &recv_request);
 
-        // Wait for communication to complete
         MPI_Wait(&send_request, MPI_STATUS_IGNORE);
         MPI_Wait(&recv_request, MPI_STATUS_IGNORE);
 
-        // Print remaining chunk information (if needed)
         if (rank == 0 && print_enabled) {
             double end_time = MPI_Wtime();
             double rtt = end_time - start_time;
-            double chunk_throughput = (2.0 * chunk_size * sizeof(uint32_t)) / (rtt * 1000 * 1000 * 8);
+            double chunk_throughput = (2.0 * remaining_elements * sizeof(uint32_t)) / (rtt * 1000 * 1000 * 8);
 
             print_chunk_info(rank, num_chunks + 1, rtt, chunk_throughput);
         }
     }
-
-    MPI_Type_free(&mpi_uint32_t);
 }
 
 int main(int argc, char **argv) {
