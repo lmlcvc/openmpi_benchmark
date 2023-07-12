@@ -4,8 +4,9 @@
 #include <iostream>
 #include <mpi.h>
 #include <chrono>
+#include <thread>
 
-void perform_rt_communication(uint32_t *message, std::size_t message_size, std::size_t round_trip,
+void perform_rt_communication(int8_t *message, std::size_t message_size, std::size_t round_trip,
                               int8_t rank, bool print_enabled = false)
 {
 
@@ -14,7 +15,9 @@ void perform_rt_communication(uint32_t *message, std::size_t message_size, std::
         double start_time = print_enabled ? MPI_Wtime() : 0.0;
 
         MPI_Request send_request;
-        MPI_Isend(message, message_size * sizeof(uint32_t), MPI_BYTE, 1 - rank, 0, MPI_COMM_WORLD,
+        MPI_Isend(message,
+                  message_size, MPI_BYTE,
+                  1, 0, MPI_COMM_WORLD,
                   &send_request);
         MPI_Wait(&send_request, MPI_STATUS_IGNORE);
 
@@ -22,7 +25,7 @@ void perform_rt_communication(uint32_t *message, std::size_t message_size, std::
         if (print_enabled)
         {
             double rtt = MPI_Wtime() - start_time;
-            double rtt_throughput = (message_size * sizeof(uint32_t) * 8) / (rtt * 1000 * 1000);
+            double rtt_throughput = (message_size * sizeof(int8_t) * 8) / (rtt * 1000 * 1000);
 
             std::cout << "Round Trip " << round_trip
                       << " - RTT: " << rtt
@@ -33,7 +36,9 @@ void perform_rt_communication(uint32_t *message, std::size_t message_size, std::
     else if (rank == 1)
     {
         MPI_Request recv_request;
-        MPI_Irecv(message, message_size * sizeof(uint32_t), MPI_BYTE, 1 - rank, 0, MPI_COMM_WORLD,
+        MPI_Irecv(message,
+                  message_size, MPI_BYTE,
+                  0, 0, MPI_COMM_WORLD,
                   &recv_request);
         MPI_Wait(&recv_request, MPI_STATUS_IGNORE);
     }
@@ -42,11 +47,10 @@ void perform_rt_communication(uint32_t *message, std::size_t message_size, std::
 int main(int argc, char **argv)
 {
     int rank, size;
-    uint32_t *message;
     double start_time, end_time, elapsed_time;
 
-    std::size_t message_size = 1000000;
-    std::size_t print_interval = 1000; // communication steps to be printed
+    std::size_t message_size = 1000000; // message size in bytes
+    std::size_t print_interval = 1000;  // communication steps to be printed
 
     bool running = true;
 
@@ -65,7 +69,7 @@ int main(int argc, char **argv)
 
     // Process command line arguments
     int opt;
-    while ((opt = getopt(argc, argv, "m:i:")) != -1)
+    while ((opt = getopt(argc, argv, "m:i:h")) != -1)
     {
         switch (opt)
         {
@@ -75,21 +79,55 @@ int main(int argc, char **argv)
         case 'i':
             print_interval = std::stoi(optarg);
             break;
+        case '?':
+        case 'h':
+        {
+            if (rank != 0)
+                break;
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(100)); // for neater terminal output
+            std::string input;
+            const std::size_t max_value = std::numeric_limits<std::size_t>::max();
+
+            std::cout << "Enter value for message size (current: " << message_size << ", max: " << max_value << "): ";
+            std::getline(std::cin, input);
+
+            if (input.empty() || (std::stoull(input) > max_value))
+            {
+                std::cout << "\tInput empty or out of bounds. Defaulting to " << message_size << std::endl;
+            }
+            else
+            {
+                message_size = std::stoi(input);
+            }
+
+            std::cout << "Enter value for print interval (current: " << print_interval << "): ";
+            std::getline(std::cin, input);
+
+            if (input.empty() || (std::stoull(input) > max_value))
+            {
+                std::cout << "\tInput empty or out of bounds. Defaulting to " << message_size << std::endl;
+            }
+            else
+            {
+                print_interval = std::stoi(input);
+            }
+
+            break;
+        }
         default:
-            std::cerr << "Usage: " << argv[0]
-                      << " -m <message-size> -i <print-interval>" << std::endl;
+            if (rank == 0)
+                std::cout << "Usage:" << argv[0] << std::endl
+                          << "\t-m <message-size>\n\t-i <print-interval>\n\t-h <help>" << std::endl;
             return 1;
         }
     }
 
-    std::cout << "Message size: " << message_size << ", interval: " << print_interval << std::endl;
+    if (rank == 0)
+        std::cout << "Message size: " << message_size << ", interval: " << print_interval << std::endl;
 
     // Initialize message and data
-    message = new uint32_t[message_size];
-    for (std::size_t i = 0; i < message_size; i++)
-    {
-        message[i] = i;
-    }
+    int8_t message[message_size] = {0};
 
     // Warmup round
     perform_rt_communication(message, message_size, 0, rank, false);
@@ -105,7 +143,9 @@ int main(int argc, char **argv)
         if (round_trip == 0)
             start_time = MPI_Wtime();
 
-        perform_rt_communication(message, message_size, round_trip, rank, (round_trip % print_interval) == 0);
+        perform_rt_communication(message, message_size,
+                                 round_trip, rank,
+                                 (round_trip % print_interval) == 0);
         round_trip++;
 
         // exit on q
@@ -118,8 +158,6 @@ int main(int argc, char **argv)
     if (rank == 0)
         std::cout << "Elapsed time: " << elapsed_time << " s" << std::endl;
 
-    // Free allocated memory and finalize
-    delete[] message;
     MPI_Finalize();
 
     return 0;
