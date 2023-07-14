@@ -10,6 +10,7 @@
 #include <mpi.h>
 #include <chrono>
 #include <thread>
+// #include <ncurses.h>
 
 timespec diff(timespec start, timespec end)
 {
@@ -177,6 +178,13 @@ int main(int argc, char **argv)
     // Warmup round
     perform_rt_communication(message, message_size, 0, rank, false);
 
+    // Initialize ncurses
+/*     initscr();
+    cbreak();              // Disable line buffering
+    noecho();              // Disable automatic echoing of characters
+    nodelay(stdscr, true); // Make getch() non-blocking
+    char ch; */
+
     // Continuous communication run
     std::size_t round_trip = 1;
     timespec start_time;
@@ -192,8 +200,10 @@ int main(int argc, char **argv)
         perform_rt_communication(message, message_size, round_trip, rank, (round_trip % print_interval) == 0);
         round_trip++;
 
-        // exit on q
-        // FIXME if (kbhit())  running = false;
+        // TODO: install ncurses on target?
+/*         ch = getch();
+        if (tolower(ch))
+            running = false; */
     }
 
     timespec end_time;
@@ -204,8 +214,9 @@ int main(int argc, char **argv)
     if (rank == 0)
         std::cout << "Elapsed time: " << elapsed_seconds << " s" << std::endl;
 
-    // Deallocate the memory
+    // Finalise Program
     std::free(mem);
+    // endwin();
     MPI_Finalize();
 
     return 0;
