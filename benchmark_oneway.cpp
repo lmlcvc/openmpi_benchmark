@@ -5,6 +5,11 @@
 #include <mpi.h>
 #include <chrono>
 #include <thread>
+#include <cstdint>
+#include <cstddef>
+#include <memory>
+#include <cstdlib>
+#include <iomanip>
 
 void perform_rt_communication(int8_t *message, std::size_t message_size, std::size_t round_trip,
                               int8_t rank, bool print_enabled = false)
@@ -27,9 +32,17 @@ void perform_rt_communication(int8_t *message, std::size_t message_size, std::si
             double rtt = MPI_Wtime() - start_time;
             double rtt_throughput = (message_size * sizeof(int8_t) * 8) / (rtt * 1000 * 1000);
 
-            std::cout << "Round Trip " << round_trip
-                      << " - RTT: " << rtt
-                      << " s | Throughput: " << rtt_throughput << " Mbit/s"
+            std::cout << std::fixed << std::setprecision(8);
+
+            std::cout << "| " << std::left << std::setw(12) << "Round Trip"
+                      << " | " << std::right << std::setw(14) << "RTT"
+                      << " | " << std::setw(25) << "Throughput"
+                      << " |" << std::endl;
+
+            std::cout << "| " << std::left << std::setw(12) << round_trip
+                      << " | " << std::right << std::setw(12) << rtt << " s"
+                      << " | " << std::setw(18) << rtt_throughput << " Mbit/s"
+                      << " |\n"
                       << std::endl;
         }
     }
@@ -50,7 +63,7 @@ int main(int argc, char **argv)
     double start_time, end_time, elapsed_time;
 
     std::size_t message_size = 1000000; // message size in bytes
-    std::size_t print_interval = 10000;  // communication steps to be printed
+    std::size_t print_interval = 10000; // communication steps to be printed
 
     bool running = true;
 
@@ -127,9 +140,11 @@ int main(int argc, char **argv)
         std::cout << "Message size: " << message_size << ", interval: " << print_interval << std::endl;
 
     // Allocate memory with desired alignment
-    constexpr std::size_t alignment = 16;
+    long page_size = sysconf(_SC_PAGESIZE);
+    std::size_t aligned_size = ((message_size * sizeof(int8_t) - 1) / page_size + 1) * page_size;
+
     void *mem = nullptr;
-    if (posix_memalign(&mem, alignment, sizeof(int8_t) * message_size))
+    if (posix_memalign(&mem, page_size, aligned_size) != 0)
     {
         std::cerr << "Memory allocation failed" << std::endl;
         return 1;
