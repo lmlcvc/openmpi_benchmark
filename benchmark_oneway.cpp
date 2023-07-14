@@ -1,15 +1,31 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
 #include <iostream>
-#include <mpi.h>
-#include <chrono>
-#include <thread>
+#include <iomanip>
+#include <limits>
+#include <cstdlib>
 #include <cstdint>
 #include <cstddef>
 #include <memory>
-#include <cstdlib>
-#include <iomanip>
+#include <unistd.h>
+#include <time.h>
+#include <mpi.h>
+#include <chrono>
+#include <thread>
+
+timespec diff(timespec start, timespec end)
+{
+    timespec time_diff;
+    if ((end.tv_nsec - start.tv_nsec) < 0)
+    {
+        time_diff.tv_sec = end.tv_sec - start.tv_sec - 1;
+        time_diff.tv_nsec = 1000000000 + end.tv_nsec - start.tv_nsec;
+    }
+    else
+    {
+        time_diff.tv_sec = end.tv_sec - start.tv_sec;
+        time_diff.tv_nsec = end.tv_nsec - start.tv_nsec;
+    }
+    return time_diff;
+}
 
 void perform_rt_communication(int8_t *message, std::size_t message_size, std::size_t round_trip,
                               int8_t rank, bool print_enabled = false)
@@ -17,19 +33,24 @@ void perform_rt_communication(int8_t *message, std::size_t message_size, std::si
 
     if (rank == 0)
     {
-        double start_time = print_enabled ? MPI_Wtime() : 0.0;
+        timespec start_time;
+        if (print_enabled)
+        {
+            clock_gettime(CLOCK_MONOTONIC, &start_time);
+        }
 
         MPI_Request send_request;
-        MPI_Isend(message,
-                  message_size, MPI_BYTE,
-                  1, 0, MPI_COMM_WORLD,
-                  &send_request);
+        MPI_Isend(message, message_size, MPI_BYTE, 1, 0, MPI_COMM_WORLD, &send_request);
         MPI_Wait(&send_request, MPI_STATUS_IGNORE);
 
         // Print message information
         if (print_enabled)
         {
-            double rtt = MPI_Wtime() - start_time;
+            timespec end_time;
+            clock_gettime(CLOCK_MONOTONIC, &end_time);
+            timespec elapsed_time = diff(start_time, end_time);
+
+            double rtt = elapsed_time.tv_sec + (elapsed_time.tv_nsec / 1e9);
             double rtt_throughput = (message_size * sizeof(int8_t) * 8) / (rtt * 1000 * 1000);
 
             std::cout << std::fixed << std::setprecision(8);
@@ -49,10 +70,7 @@ void perform_rt_communication(int8_t *message, std::size_t message_size, std::si
     else if (rank == 1)
     {
         MPI_Request recv_request;
-        MPI_Irecv(message,
-                  message_size, MPI_BYTE,
-                  0, 0, MPI_COMM_WORLD,
-                  &recv_request);
+        MPI_Irecv(message, message_size, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &recv_request);
         MPI_Wait(&recv_request, MPI_STATUS_IGNORE);
     }
 }
@@ -60,7 +78,6 @@ void perform_rt_communication(int8_t *message, std::size_t message_size, std::si
 int main(int argc, char **argv)
 {
     int rank, size;
-    double start_time, end_time, elapsed_time;
 
     std::size_t message_size = 1000000; // message size in bytes
     std::size_t print_interval = 10000; // communication steps to be printed
@@ -92,7 +109,6 @@ int main(int argc, char **argv)
         case 'i':
             print_interval = std::stoi(optarg);
             break;
-        case '?':
         case 'h':
         {
             if (rank != 0)
@@ -102,7 +118,8 @@ int main(int argc, char **argv)
             std::string input;
             const std::size_t max_value = std::numeric_limits<std::size_t>::max();
 
-            std::cout << "Enter value for message size (current: " << message_size << ", max: " << max_value << "): ";
+            std::cout << "Enter value for message size (current: " << message_size << ", max: " << max_value
+                      << "): ";
             std::getline(std::cin, input);
 
             if (input.empty() || (std::stoull(input) > max_value))
@@ -137,7 +154,10 @@ int main(int argc, char **argv)
     }
 
     if (rank == 0)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
         std::cout << "Message size: " << message_size << ", interval: " << print_interval << std::endl;
+    }
 
     // Allocate memory with desired alignment
     long page_size = sysconf(_SC_PAGESIZE);
@@ -159,29 +179,30 @@ int main(int argc, char **argv)
 
     // Continuous communication run
     std::size_t round_trip = 1;
-    start_time = MPI_Wtime();
+    timespec start_time;
+    clock_gettime(CLOCK_MONOTONIC, &start_time);
     double current_time;
 
     while (running)
     {
         // handle overflow
         if (round_trip == 0)
-            start_time = MPI_Wtime();
+            clock_gettime(CLOCK_MONOTONIC, &start_time);
 
-        perform_rt_communication(message, message_size,
-                                 round_trip, rank,
-                                 (round_trip % print_interval) == 0);
+        perform_rt_communication(message, message_size, round_trip, rank, (round_trip % print_interval) == 0);
         round_trip++;
 
         // exit on q
         // FIXME if (kbhit())  running = false;
     }
 
-    end_time = MPI_Wtime();
-    elapsed_time = end_time - start_time;
+    timespec end_time;
+    clock_gettime(CLOCK_MONOTONIC, &end_time);
+    timespec elapsed_time = diff(start_time, end_time);
+    double elapsed_seconds = elapsed_time.tv_sec + (elapsed_time.tv_nsec / 1e9);
 
     if (rank == 0)
-        std::cout << "Elapsed time: " << elapsed_time << " s" << std::endl;
+        std::cout << "Elapsed time: " << elapsed_seconds << " s" << std::endl;
 
     // Deallocate the memory
     std::free(mem);
