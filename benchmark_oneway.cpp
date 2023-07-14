@@ -50,7 +50,7 @@ int main(int argc, char **argv)
     double start_time, end_time, elapsed_time;
 
     std::size_t message_size = 1000000; // message size in bytes
-    std::size_t print_interval = 1000;  // communication steps to be printed
+    std::size_t print_interval = 10000;  // communication steps to be printed
 
     bool running = true;
 
@@ -126,8 +126,18 @@ int main(int argc, char **argv)
     if (rank == 0)
         std::cout << "Message size: " << message_size << ", interval: " << print_interval << std::endl;
 
+    // Allocate memory with desired alignment
+    constexpr std::size_t alignment = 16;
+    void *mem = nullptr;
+    if (posix_memalign(&mem, alignment, sizeof(int8_t) * message_size))
+    {
+        std::cerr << "Memory allocation failed" << std::endl;
+        return 1;
+    }
+
     // Initialize message and data
-    int8_t message[message_size] = {0};
+    int8_t *message = static_cast<int8_t *>(mem);
+    std::fill(message, message + message_size, 0);
 
     // Warmup round
     perform_rt_communication(message, message_size, 0, rank, false);
@@ -158,6 +168,8 @@ int main(int argc, char **argv)
     if (rank == 0)
         std::cout << "Elapsed time: " << elapsed_time << " s" << std::endl;
 
+    // Deallocate the memory
+    std::free(mem);
     MPI_Finalize();
 
     return 0;
