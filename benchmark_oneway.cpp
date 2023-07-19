@@ -10,7 +10,7 @@
 #include <mpi.h>
 #include <chrono>
 #include <thread>
-// #include <ncurses.h>
+#include <cmath>
 
 timespec diff(timespec start, timespec end)
 {
@@ -29,7 +29,7 @@ timespec diff(timespec start, timespec end)
 }
 
 void perform_rt_communication(int8_t *message, std::size_t message_size, std::size_t round_trip,
-                              int8_t rank, bool print_enabled = false)
+                              int8_t rank, bool print_enabled = false, bool continuous_send = true)
 {
 
     if (rank == 0)
@@ -54,18 +54,28 @@ void perform_rt_communication(int8_t *message, std::size_t message_size, std::si
             double rtt = elapsed_time.tv_sec + (elapsed_time.tv_nsec / 1e9);
             double rtt_throughput = (message_size * sizeof(int8_t) * 8) / (rtt * 1000 * 1000);
 
-            std::cout << std::fixed << std::setprecision(8);
+            std::cout << std::fixed << std::setprecision(2);
+            if (continuous_send)
+            {
+                std::cout << std::fixed << std::setprecision(8);
 
-            std::cout << "| " << std::left << std::setw(12) << "Round Trip"
-                      << " | " << std::right << std::setw(14) << "RTT"
-                      << " | " << std::setw(25) << "Throughput"
-                      << " |" << std::endl;
+                std::cout << "| " << std::left << std::setw(12) << "Round Trip"
+                          << " | " << std::right << std::setw(14) << "RTT"
+                          << " | " << std::setw(25) << "Throughput"
+                          << " |" << std::endl;
 
-            std::cout << "| " << std::left << std::setw(12) << round_trip
-                      << " | " << std::right << std::setw(12) << rtt << " s"
-                      << " | " << std::setw(18) << rtt_throughput << " Mbit/s"
-                      << " |\n"
-                      << std::endl;
+                std::cout << "| " << std::left << std::setw(12) << round_trip
+                          << " | " << std::right << std::setw(12) << rtt << " s"
+                          << " | " << std::setw(18) << rtt_throughput << " Mbit/s"
+                          << " |\n"
+                          << std::endl;
+            }
+            else
+            {
+                std::cout << "| " << std::left << std::setw(12) << message_size
+                          << " | " << std::setw(19) << rtt_throughput
+                          << " |\n";
+            }
         }
     }
     else if (rank == 1)
@@ -82,8 +92,7 @@ int main(int argc, char **argv)
 
     std::size_t message_size = 1000000; // message size in bytes
     std::size_t print_interval = 10000; // communication steps to be printed
-
-    bool running = true;
+    bool continuous_send = true;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -100,7 +109,7 @@ int main(int argc, char **argv)
 
     // Process command line arguments
     int opt;
-    while ((opt = getopt(argc, argv, "m:i:h")) != -1)
+    while ((opt = getopt(argc, argv, "m:i:sh")) != -1)
     {
         switch (opt)
         {
@@ -110,6 +119,9 @@ int main(int argc, char **argv)
         case 'i':
             print_interval = std::stoi(optarg);
             break;
+        case 's':
+            continuous_send = false;
+            break;
         case 'h':
         {
             if (rank != 0)
@@ -117,8 +129,18 @@ int main(int argc, char **argv)
 
             std::this_thread::sleep_for(std::chrono::milliseconds(100)); // for neater terminal output
             std::string input;
-            const std::size_t max_value = std::numeric_limits<std::size_t>::max();
 
+            // Prompt for continuous run
+            std::cout << "Perform continuous run? (y/N): ";
+            std::getline(std::cin, input);
+
+            if (input.length() > 0 && tolower(input[0]) == 'n')
+            {
+                continuous_send = false;
+                break;
+            }
+
+            const std::size_t max_value = std::numeric_limits<std::size_t>::max();
             std::cout << "Enter value for message size (current: " << message_size << ", max: " << max_value
                       << "): ";
             std::getline(std::cin, input);
@@ -149,15 +171,9 @@ int main(int argc, char **argv)
         default:
             if (rank == 0)
                 std::cout << "Usage:" << argv[0] << std::endl
-                          << "\t-m <message-size>\n\t-i <print-interval>\n\t-h <help>" << std::endl;
+                          << "\t-m <message-size>\n\t-i <print-interval>\n\t-s perform scan\n\t-h <help>" << std::endl;
             return 1;
         }
-    }
-
-    if (rank == 0)
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        std::cout << "Message size: " << message_size << ", interval: " << print_interval << std::endl;
     }
 
     // Allocate memory with desired alignment
@@ -178,32 +194,63 @@ int main(int argc, char **argv)
     // Warmup round
     perform_rt_communication(message, message_size, 0, rank, false);
 
-    // Initialize ncurses
-/*     initscr();
-    cbreak();              // Disable line buffering
-    noecho();              // Disable automatic echoing of characters
-    nodelay(stdscr, true); // Make getch() non-blocking
-    char ch; */
+    // Scan operation on message sizes
+    std::size_t total_rounds;
+    MPI_Allreduce(&message_size, &total_rounds, 1, MPI_UNSIGNED_LONG, MPI_SUM, MPI_COMM_WORLD);
 
-    // Continuous communication run
+    // Continuous or discrete communication run
     std::size_t round_trip = 1;
     timespec start_time;
     clock_gettime(CLOCK_MONOTONIC, &start_time);
-    double current_time;
 
-    while (running)
+    // Initialize ncurses
+    /*     initscr();
+        cbreak();              // Disable line buffering
+        noecho();              // Disable automatic echoing of characters
+        nodelay(stdscr, true); // Make getch() non-blocking
+        char ch; */
+
+    if (continuous_send)
     {
-        // handle overflow
-        if (round_trip == 0)
-            clock_gettime(CLOCK_MONOTONIC, &start_time);
+        if (rank == 0)
+            std::cout << "Message size: " << message_size << ", interval: " << print_interval << std::endl;
 
-        perform_rt_communication(message, message_size, round_trip, rank, (round_trip % print_interval) == 0);
-        round_trip++;
+        bool running = true;
+        while (running)
+        {
+            // handle overflow
+            if (round_trip == 0)
+                clock_gettime(CLOCK_MONOTONIC, &start_time);
 
-        // TODO: install ncurses on target?
-/*         ch = getch();
-        if (tolower(ch))
-            running = false; */
+            perform_rt_communication(message, message_size, round_trip, rank, (round_trip % print_interval) == 0);
+            round_trip++;
+
+            // TODO: install ncurses on target?
+            /*         ch = getch();
+                    if (tolower(ch))
+                        running = false; */
+        }
+    }
+    else
+    {
+        if (rank == 0)
+        {
+            std::cout << std::fixed << std::setprecision(2);
+            std::cout << "| " << std::left << std::setw(12) << "Bytes"
+                      << " | " << std::setw(18) << "Throughput [Mbit/s]"
+                      << " |\n";
+            std::cout << "--------------------------------------\n";
+        }
+
+        std::size_t max_power = 24;
+        for (std::size_t power = 0; power <= max_power; power++)
+        {
+            std::size_t current_message_size = static_cast<std::size_t>(std::pow(2, power));
+            perform_rt_communication(message, current_message_size, round_trip, rank, true, false);
+            round_trip++;
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(75)); // prevent segfault ?
+        }
     }
 
     timespec end_time;
@@ -211,10 +258,10 @@ int main(int argc, char **argv)
     timespec elapsed_time = diff(start_time, end_time);
     double elapsed_seconds = elapsed_time.tv_sec + (elapsed_time.tv_nsec / 1e9);
 
-    if (rank == 0)
+    if (rank == 0 && continuous_send)
         std::cout << "Elapsed time: " << elapsed_seconds << " s" << std::endl;
 
-    // Finalise Program
+    // Finalize Program
     std::free(mem);
     // endwin();
     MPI_Finalize();
