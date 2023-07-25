@@ -29,60 +29,36 @@ timespec diff(timespec start, timespec end)
     return time_diff;
 }
 
-
 // Functions for formatted throughput info printing
-void print_continuous(std::size_t round_trip, double rtt, double throughput)
+void print_continuous(double rtt, double throughput)
 {
     std::cout << std::fixed << std::setprecision(8);
 
-    std::cout << "| " << std::left << std::setw(12) << "Round Trip"
-                << " | " << std::right << std::setw(14) << "RTT"
-                << " | " << std::setw(25) << "Throughput"
-                << " |" << std::endl;
+    std::cout << std::right << std::setw(14) << " Avg. RTT"
+              << " | " << std::setw(25) << "Throughput"
+              << std::endl;
 
-    std::cout << "| " << std::left << std::setw(12) << round_trip
-                << " | " << std::right << std::setw(12) << rtt << " s"
-                << " | " << std::setw(18) << throughput << " Mbit/s"
-                << " |\n"
-                << std::endl;
+    std::cout << std::right << std::setw(12) << rtt << " s"
+              << " | " << std::setw(18) << std::fixed << std::setprecision(2) << throughput << " Mbit/s\n"
+              << std::endl;
 }
 
 void print_discrete(std::size_t message_size, double throughput)
 {
     std::cout << std::fixed << std::setprecision(2);
     std::cout << "| " << std::left << std::setw(12) << message_size
-                        << " | " << std::setw(19) << throughput
-                        << " |\n";
+              << " | " << std::setw(19) << throughput
+              << " |\n";
 }
 
 // Function to perform round-trip communication between two processes
-void perform_rt_communication(int8_t *message, std::size_t message_size, std::size_t round_trip,
-                              int8_t rank, bool print_enabled = false, bool continuous_send = true)
+void perform_rt_communication(int8_t *message, std::size_t message_size, int8_t rank)
 {
     if (rank == 0)
     {
-        timespec rt_start_time;
-        if (print_enabled)
-        {
-            clock_gettime(CLOCK_MONOTONIC, &rt_start_time);
-        }
-
         MPI_Request send_request;
         MPI_Isend(message, message_size, MPI_BYTE, 1, 0, MPI_COMM_WORLD, &send_request);
         MPI_Wait(&send_request, MPI_STATUS_IGNORE);
-
-        // Print message information
-        if (print_enabled)
-        {
-            timespec end_time;
-            clock_gettime(CLOCK_MONOTONIC, &end_time);
-            timespec elapsed_time = diff(rt_start_time, end_time);
-
-            double rtt = elapsed_time.tv_sec + (elapsed_time.tv_nsec / 1e9);
-            double throughput = (message_size * sizeof(int8_t) * 8) / (rtt * 1000 * 1000);
-
-            continuous_send ? print_continuous(round_trip, rtt, throughput) : print_discrete(message_size, throughput);
-        }
     }
     else if (rank == 1)
     {
@@ -92,64 +68,83 @@ void perform_rt_communication(int8_t *message, std::size_t message_size, std::si
     }
 }
 
-// Function to perform continuous round-trip communication
 void setup_continuous_communication(int8_t *message, std::size_t message_size, int8_t rank, std::size_t print_interval)
 {
     if (rank == 0)
         std::cout << "Message size: " << message_size << ", interval: " << print_interval << std::endl;
 
-    // time of run start
+    std::size_t message_count = 0;
+    bool running = true;
+
+    timespec end_time;
     timespec start_time;
     clock_gettime(CLOCK_MONOTONIC, &start_time);
 
-    std::size_t round_trip = 1;
-    bool running = true;
-
     while (running)
     {
-        // handle overflow
-        if (round_trip == 0)
-            clock_gettime(CLOCK_MONOTONIC, &start_time);
+        perform_rt_communication(message, message_size, rank);
+        message_count++;
 
-        perform_rt_communication(message, message_size, round_trip, rank, (round_trip % print_interval) == 0);
-        round_trip++;
+        if (rank == 0 && (message_count % print_interval) == 0)
+        {
+            clock_gettime(CLOCK_MONOTONIC, &end_time);
+            timespec elapsed_time = diff(start_time, end_time);
+            double elapsed_secs = elapsed_time.tv_sec + (elapsed_time.tv_nsec / 1e9);
+
+            double avg_rtt = elapsed_secs / print_interval;
+            double avg_throughput = (print_interval * message_size * 8.0) / (elapsed_secs * 1e6);
+
+            print_continuous(avg_rtt, avg_throughput);
+
+            // reset counters
+            message_count = 0;
+            clock_gettime(CLOCK_MONOTONIC, &start_time);
+        }
 
         // TODO: install ncurses on target?
         /*  ch = getch();
             if (tolower(ch))
                 running = false; */
-
     }
-
-    // time of run finish
-    timespec end_time;
-    clock_gettime(CLOCK_MONOTONIC, &end_time);
-    timespec elapsed_time = diff(start_time, end_time);
-    double elapsed_seconds = elapsed_time.tv_sec + (elapsed_time.tv_nsec / 1e9);
-
-    if (rank == 0)
-        std::cout << "Elapsed time: " << elapsed_seconds << " s" << std::endl;
 }
 
-// Function to perform discrete round-trip communication
-void setup_discrete_communication(int8_t *message, int8_t rank, std::size_t max_power = 24)
+void setup_discrete_communication(int8_t *message, int8_t rank, std::size_t max_power = 20)
 {
     if (rank == 0)
     {
         std::cout << std::fixed << std::setprecision(2);
         std::cout << "| " << std::left << std::setw(12) << "Bytes"
-                    << " | " << std::setw(18) << "Throughput [Mbit/s]"
-                    << " |\n";
+                  << " | " << std::setw(18) << "Throughput [Mbit/s]"
+                  << " |\n";
         std::cout << "--------------------------------------\n";
     }
 
-    std::size_t round_trip = 1;
+    timespec end_time;
+    timespec start_time;
 
     for (std::size_t power = 0; power <= max_power; power++)
     {
         std::size_t current_message_size = static_cast<std::size_t>(std::pow(2, power));
-        perform_rt_communication(message, current_message_size, round_trip, rank, true, false);
-        round_trip++;
+        std::size_t iteration_count = 10000;
+
+        clock_gettime(CLOCK_MONOTONIC, &start_time);
+
+        // Perform iteration_count sends for message of current_message_size
+        for (std::size_t iteration = 0; iteration < iteration_count; iteration++)
+            perform_rt_communication(message, current_message_size, rank);
+
+        // Calculate and print average throughput for this message size
+        clock_gettime(CLOCK_MONOTONIC, &end_time);
+        timespec elapsed_time = diff(start_time, end_time);
+        double elapsed_secs = elapsed_time.tv_sec + (elapsed_time.tv_nsec / 1e9);
+
+        double avg_throughput = (iteration_count * current_message_size * 8.0) / (elapsed_secs * 1e6);
+
+        if (rank == 0)
+            print_discrete(current_message_size, avg_throughput);
+
+        // Reset time
+        clock_gettime(CLOCK_MONOTONIC, &start_time);
     }
 }
 
@@ -213,23 +208,19 @@ int main(int argc, char **argv)
     int8_t *message = static_cast<int8_t *>(mem);
     std::fill(message, message + message_size, 0);
 
-    // Warmup round
-    perform_rt_communication(message, message_size, 0, rank, false);
-
     // Scan operation on message sizes
     std::size_t total_rounds;
 
-     // Initialize ncurses
+    // Initialize ncurses
     /*     initscr();
         cbreak();              // Disable line buffering
         noecho();              // Disable automatic echoing of characters
         nodelay(stdscr, true); // Make getch() non-blocking
         char ch; */
 
-
     if (continuous_send)
     {
-        setup_continuous_communication(message, message_size, rank, print_interval);        
+        setup_continuous_communication(message, message_size, rank, print_interval);
     }
     else
     {
