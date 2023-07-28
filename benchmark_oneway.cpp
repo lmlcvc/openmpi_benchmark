@@ -12,7 +12,6 @@
 #include <thread>
 #include <cmath>
 
-// Function to calculate the difference between two timespec structures
 timespec diff(timespec start, timespec end)
 {
     timespec time_diff;
@@ -57,12 +56,14 @@ void perform_rt_communication(int8_t *message, std::size_t message_size, int8_t 
     if (rank == 0)
     {
         MPI_Request send_request;
+        // TODO: vector of isends
         MPI_Isend(message, message_size, MPI_BYTE, 1, 0, MPI_COMM_WORLD, &send_request);
         MPI_Wait(&send_request, MPI_STATUS_IGNORE);
     }
     else if (rank == 1)
     {
         MPI_Request recv_request;
+        // TODO: vector of irecvs
         MPI_Irecv(message, message_size, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &recv_request);
         MPI_Wait(&recv_request, MPI_STATUS_IGNORE);
     }
@@ -87,6 +88,8 @@ void setup_continuous_communication(int8_t *message, std::size_t message_size, i
 
         if (rank == 0 && (message_count % print_interval) == 0)
         {
+            // TODO: waitall on vectors
+
             clock_gettime(CLOCK_MONOTONIC, &end_time);
             timespec elapsed_time = diff(start_time, end_time);
             double elapsed_secs = elapsed_time.tv_sec + (elapsed_time.tv_nsec / 1e9);
@@ -101,14 +104,11 @@ void setup_continuous_communication(int8_t *message, std::size_t message_size, i
             clock_gettime(CLOCK_MONOTONIC, &start_time);
         }
 
-        // TODO: install ncurses on target?
-        /*  ch = getch();
-            if (tolower(ch))
-                running = false; */
+        // TODO: trap SIGINT to exit
     }
 }
 
-void setup_discrete_communication(int8_t *message, int8_t rank, std::size_t max_power = 20)
+void setup_discrete_communication(int8_t *message, int8_t rank, std::size_t max_power = 22)
 {
     if (rank == 0)
     {
@@ -156,6 +156,9 @@ int main(int argc, char **argv)
     std::size_t print_interval = 10000; // communication steps to be printed
     bool continuous_send = true;
 
+    std::size_t min_message_size = 1000; // ?
+    std::size_t min_interval = 10000;
+
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
@@ -171,19 +174,25 @@ int main(int argc, char **argv)
 
     // Process command line arguments
     int opt;
+    std::size_t tmp;
     while ((opt = getopt(argc, argv, "m:i:sh")) != -1)
     {
         switch (opt)
         {
-        case 'm':
-            message_size = std::stoi(optarg);
-            break;
-        case 'i':
-            print_interval = std::stoi(optarg);
-            break;
         case 's':
             continuous_send = false;
             break;
+        case 'm':
+            if(!continuous_send) break;
+            tmp = std::stoi(optarg);
+            message_size = (tmp >= min_message_size) ? tmp : min_message_size;
+            break;
+        case 'i':
+            if(!continuous_send) break;
+            tmp = std::stoi(optarg);
+            print_interval = (tmp >= min_interval) ? tmp : min_interval;
+            break;
+
         case 'h':
         default:
             if (rank == 0)
@@ -197,6 +206,7 @@ int main(int argc, char **argv)
     // Allocate memory with desired alignment
     long page_size = sysconf(_SC_PAGESIZE);
     void *mem = nullptr;
+    // TODO: smart pointers
     if (posix_memalign(&mem, page_size, message_size) != 0)
     {
         std::cerr << "Memory allocation failed" << std::endl;
@@ -205,18 +215,12 @@ int main(int argc, char **argv)
     }
 
     // Initialise message and data
+    // TODO: allocate max size of scan
     int8_t *message = static_cast<int8_t *>(mem);
     std::fill(message, message + message_size, 0);
 
     // Scan operation on message sizes
     std::size_t total_rounds;
-
-    // Initialize ncurses
-    /*     initscr();
-        cbreak();              // Disable line buffering
-        noecho();              // Disable automatic echoing of characters
-        nodelay(stdscr, true); // Make getch() non-blocking
-        char ch; */
 
     if (continuous_send)
     {
@@ -229,7 +233,6 @@ int main(int argc, char **argv)
 
     // Finalise program
     std::free(mem);
-    // endwin();
     MPI_Finalize();
 
     return 0;
