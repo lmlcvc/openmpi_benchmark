@@ -158,6 +158,7 @@ int main(int argc, char **argv)
 
     std::size_t min_message_size = 1000; // ?
     std::size_t min_interval = 10000;
+    std::size_t max_power = 22;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -183,12 +184,14 @@ int main(int argc, char **argv)
             continuous_send = false;
             break;
         case 'm':
-            if(!continuous_send) break;
+            if (!continuous_send)
+                break;
             tmp = std::stoi(optarg);
             message_size = (tmp >= min_message_size) ? tmp : min_message_size;
             break;
         case 'i':
-            if(!continuous_send) break;
+            if (!continuous_send)
+                break;
             tmp = std::stoi(optarg);
             print_interval = (tmp >= min_interval) ? tmp : min_interval;
             break;
@@ -207,7 +210,9 @@ int main(int argc, char **argv)
     long page_size = sysconf(_SC_PAGESIZE);
     void *mem = nullptr;
     // TODO: smart pointers
-    if (posix_memalign(&mem, page_size, message_size) != 0)
+    std::size_t align_size = continuous_send ? message_size : static_cast<std::size_t>(std::pow(2, max_power));
+
+    if (posix_memalign(&mem, page_size, align_size) != 0)
     {
         std::cerr << "Memory allocation failed" << std::endl;
         MPI_Finalize();
@@ -215,12 +220,10 @@ int main(int argc, char **argv)
     }
 
     // Initialise message and data
-    // TODO: allocate max size of scan
     int8_t *message = static_cast<int8_t *>(mem);
-    std::fill(message, message + message_size, 0);
+    std::fill(message, message + align_size, 0);
 
-    // Scan operation on message sizes
-    std::size_t total_rounds;
+    // TODO: warmups
 
     if (continuous_send)
     {
