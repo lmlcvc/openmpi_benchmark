@@ -11,6 +11,17 @@
 #include <chrono>
 #include <thread>
 #include <cmath>
+#include <csignal>
+
+// FIXME: sigint capture not making error but not working
+
+// Global flag to indicate if SIGINT has been received
+volatile sig_atomic_t sigintReceived = 0;
+
+// Signal handler function for SIGINT
+void sigintHandler(int signal) {
+    sigintReceived = 1;
+}
 
 timespec diff(timespec start, timespec end)
 {
@@ -104,7 +115,12 @@ void setup_continuous_communication(int8_t *message, std::size_t message_size, i
             clock_gettime(CLOCK_MONOTONIC, &start_time);
         }
 
-        // TODO: trap SIGINT to exit
+        if (sigintReceived) {
+            // TODO: Perform any cleanup or additional work needed before exiting
+            // TODO: print run info
+            std::cout << "Exiting..." << std::endl;
+            std::exit(EXIT_SUCCESS);
+        }
     }
 }
 
@@ -159,6 +175,8 @@ int main(int argc, char **argv)
     std::size_t min_message_size = 1000; // ?
     std::size_t min_interval = 10000;
     std::size_t max_power = 22;
+
+    std::signal(SIGINT, sigintHandler);
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
