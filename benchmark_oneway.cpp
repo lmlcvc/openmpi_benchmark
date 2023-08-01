@@ -16,8 +16,8 @@
 
 // FIXME: sigint capture not making error but not working
 
-// Global flag to indicate if SIGINT has been received
-volatile sig_atomic_t sigintReceived = 0;
+volatile sig_atomic_t sigintReceived = 0; // indicate if SIGINT has been received
+timespec run_start_time;                  // time of run start once program is set up
 
 // Signal handler function for SIGINT
 void sigintHandler(int signal)
@@ -39,6 +39,16 @@ timespec diff(timespec start, timespec end)
         time_diff.tv_nsec = end.tv_nsec - start.tv_nsec;
     }
     return time_diff;
+}
+
+void print_elapsed()
+{
+    timespec run_end_time;
+    clock_gettime(CLOCK_MONOTONIC, &run_end_time);
+    timespec elapsed_time = diff(run_start_time, run_end_time);
+    double elapsed_seconds = elapsed_time.tv_sec + (elapsed_time.tv_nsec / 1e9);
+
+    std::cout << "Total elapsed time: " << elapsed_seconds << " s" << std::endl;
 }
 
 // Functions for formatted throughput info printing
@@ -120,8 +130,8 @@ void setup_continuous_communication(int8_t *message, std::size_t message_size, i
 
         if (sigintReceived)
         {
-            // TODO: print run info
-            std::cout << "Exiting..." << std::endl;
+            if (rank == 0)
+                print_elapsed();
             std::exit(EXIT_SUCCESS);
         }
     }
@@ -259,6 +269,9 @@ int main(int argc, char **argv)
                                  send_requests, recv_requests,
                                  send_statuses, recv_statuses);
 
+    // Run program
+    clock_gettime(CLOCK_MONOTONIC, &run_start_time);
+
     if (continuous_send)
     {
         setup_continuous_communication(message, message_size, rank, print_interval,
@@ -273,6 +286,9 @@ int main(int argc, char **argv)
     }
 
     // Finalise program
+    if (rank == 0)
+        print_elapsed();
+
     std::free(mem);
     MPI_Finalize();
 
