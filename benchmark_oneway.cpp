@@ -12,6 +12,7 @@
 #include <thread>
 #include <cmath>
 #include <csignal>
+#include <vector>
 
 // FIXME: sigint capture not making error but not working
 
@@ -19,7 +20,8 @@
 volatile sig_atomic_t sigintReceived = 0;
 
 // Signal handler function for SIGINT
-void sigintHandler(int signal) {
+void sigintHandler(int signal)
+{
     sigintReceived = 1;
 }
 
@@ -62,25 +64,32 @@ void print_discrete(std::size_t message_size, double throughput)
 }
 
 // Function to perform round-trip communication between two processes
-void perform_rt_communication(int8_t *message, std::size_t message_size, int8_t rank)
+void perform_rt_communication(int8_t *message, std::size_t message_size, int8_t rank, std::size_t print_interval,
+                              std::vector<MPI_Request> &send_requests, std::vector<MPI_Request> &recv_requests,
+                              std::vector<MPI_Status> &send_statuses, std::vector<MPI_Status> &recv_statuses)
 {
+    // FIXME: waitall left hanging
     if (rank == 0)
     {
-        MPI_Request send_request;
-        // TODO: vector of isends
-        MPI_Isend(message, message_size, MPI_BYTE, 1, 0, MPI_COMM_WORLD, &send_request);
-        MPI_Wait(&send_request, MPI_STATUS_IGNORE);
+        for (std::size_t i = 0; i < print_interval; i++)
+        {
+            MPI_Isend(message, message_size, MPI_BYTE, 1, 0, MPI_COMM_WORLD, &send_requests[i]);
+        }
+        MPI_Waitall(print_interval, send_requests.data(), send_statuses.data());
     }
     else if (rank == 1)
     {
-        MPI_Request recv_request;
-        // TODO: vector of irecvs
-        MPI_Irecv(message, message_size, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &recv_request);
-        MPI_Wait(&recv_request, MPI_STATUS_IGNORE);
+        for (std::size_t i = 0; i < print_interval; i++)
+        {
+            MPI_Irecv(message, message_size, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &recv_requests[i]);
+        }
+        MPI_Waitall(print_interval, recv_requests.data(), recv_statuses.data());
     }
 }
 
-void setup_continuous_communication(int8_t *message, std::size_t message_size, int8_t rank, std::size_t print_interval)
+void setup_continuous_communication(int8_t *message, std::size_t message_size, int8_t rank, std::size_t print_interval,
+                                    std::vector<MPI_Request> &send_requests, std::vector<MPI_Request> &recv_requests,
+                                    std::vector<MPI_Status> &send_statuses, std::vector<MPI_Status> &recv_statuses)
 {
     if (rank == 0)
         std::cout << "Message size: " << message_size << ", interval: " << print_interval << std::endl;
@@ -94,29 +103,23 @@ void setup_continuous_communication(int8_t *message, std::size_t message_size, i
 
     while (running)
     {
-        perform_rt_communication(message, message_size, rank);
-        message_count++;
+        perform_rt_communication(message, message_size, rank, print_interval, send_requests, recv_requests,
+                                 send_statuses, recv_statuses);
 
-        if (rank == 0 && (message_count % print_interval) == 0)
+        clock_gettime(CLOCK_MONOTONIC, &end_time);
+        timespec elapsed_time = diff(start_time, end_time);
+        double elapsed_secs = elapsed_time.tv_sec + (elapsed_time.tv_nsec / 1e9);
+
+        double avg_rtt = elapsed_secs / print_interval;
+        double avg_throughput = (print_interval * message_size * 8.0) / (elapsed_secs * 1e6);
+
+        print_continuous(avg_rtt, avg_throughput);
+
+        // Reset counters
+        clock_gettime(CLOCK_MONOTONIC, &start_time);
+
+        if (sigintReceived)
         {
-            // TODO: waitall on vectors
-
-            clock_gettime(CLOCK_MONOTONIC, &end_time);
-            timespec elapsed_time = diff(start_time, end_time);
-            double elapsed_secs = elapsed_time.tv_sec + (elapsed_time.tv_nsec / 1e9);
-
-            double avg_rtt = elapsed_secs / print_interval;
-            double avg_throughput = (print_interval * message_size * 8.0) / (elapsed_secs * 1e6);
-
-            print_continuous(avg_rtt, avg_throughput);
-
-            // reset counters
-            message_count = 0;
-            clock_gettime(CLOCK_MONOTONIC, &start_time);
-        }
-
-        if (sigintReceived) {
-            // TODO: Perform any cleanup or additional work needed before exiting
             // TODO: print run info
             std::cout << "Exiting..." << std::endl;
             std::exit(EXIT_SUCCESS);
@@ -124,7 +127,9 @@ void setup_continuous_communication(int8_t *message, std::size_t message_size, i
     }
 }
 
-void setup_discrete_communication(int8_t *message, int8_t rank, std::size_t max_power = 22)
+void setup_discrete_communication(int8_t *message, int8_t rank,
+                                  std::vector<MPI_Request> &send_requests, std::vector<MPI_Request> &recv_requests,
+                                  std::vector<MPI_Status> &send_statuses, std::vector<MPI_Status> &recv_statuses, std::size_t max_power = 22)
 {
     if (rank == 0)
     {
@@ -147,7 +152,9 @@ void setup_discrete_communication(int8_t *message, int8_t rank, std::size_t max_
 
         // Perform iteration_count sends for message of current_message_size
         for (std::size_t iteration = 0; iteration < iteration_count; iteration++)
-            perform_rt_communication(message, current_message_size, rank);
+            perform_rt_communication(message, current_message_size, rank, iteration_count,
+                                     send_requests, recv_requests,
+                                     send_statuses, recv_statuses);
 
         // Calculate and print average throughput for this message size
         clock_gettime(CLOCK_MONOTONIC, &end_time);
@@ -241,15 +248,28 @@ int main(int argc, char **argv)
     int8_t *message = static_cast<int8_t *>(mem);
     std::fill(message, message + align_size, 0);
 
-    // TODO: warmups
+    std::vector<MPI_Request> send_requests(print_interval);
+    std::vector<MPI_Request> recv_requests(print_interval);
+    std::vector<MPI_Status> send_statuses(print_interval);
+    std::vector<MPI_Status> recv_statuses(print_interval);
+
+    // Perform warmup
+    for (std::size_t i = 0; i < print_interval; i++)
+        perform_rt_communication(message, message_size, rank, print_interval,
+                                 send_requests, recv_requests,
+                                 send_statuses, recv_statuses);
 
     if (continuous_send)
     {
-        setup_continuous_communication(message, message_size, rank, print_interval);
+        setup_continuous_communication(message, message_size, rank, print_interval,
+                                       send_requests, recv_requests,
+                                       send_statuses, recv_statuses);
     }
     else
     {
-        setup_discrete_communication(message, rank);
+        setup_discrete_communication(message, rank,
+                                     send_requests, recv_requests,
+                                     send_statuses, recv_statuses);
     }
 
     // Finalise program
