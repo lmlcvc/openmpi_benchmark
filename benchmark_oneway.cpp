@@ -244,7 +244,6 @@ int main(int argc, char **argv)
     // Allocate memory with desired alignment
     long page_size = sysconf(_SC_PAGESIZE);
     void *mem = nullptr;
-    // TODO: smart pointers
     std::size_t align_size = continuous_send ? message_size : static_cast<std::size_t>(std::pow(2, max_power));
 
     if (posix_memalign(&mem, page_size, align_size) != 0)
@@ -257,6 +256,8 @@ int main(int argc, char **argv)
     // Initialise message and data
     int8_t *message = static_cast<int8_t *>(mem);
     std::fill(message, message + align_size, 0);
+
+    std::unique_ptr<void, decltype(&free)> mem_ptr(mem, &free);
 
     std::vector<MPI_Request> send_requests(print_interval);
     std::vector<MPI_Request> recv_requests(print_interval);
@@ -288,8 +289,6 @@ int main(int argc, char **argv)
     // Finalise program
     if (rank == 0)
         print_elapsed();
-
-    std::free(mem);
     MPI_Finalize();
 
     return 0;
