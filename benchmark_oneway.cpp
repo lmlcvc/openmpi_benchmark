@@ -48,6 +48,23 @@ timespec diff(timespec start, timespec end)
     return time_diff;
 }
 
+std::vector<std::pair<int, int>> find_subarray_indices(int message_size)
+{
+    int subarray_size = std::ceil(0.32 * message_size);
+    int shared_elements = std::ceil(0.15 * message_size);
+
+    std::vector<std::pair<int, int>> subarray_indices;
+
+    for (int i = 0; i < 5; ++i)
+    {
+        int start = i * (subarray_size - shared_elements);
+        int end = start + subarray_size;
+        subarray_indices.push_back(std::make_pair(start, end));
+    }
+
+    return subarray_indices;
+}
+
 void print_elapsed()
 {
     timespec run_end_time;
@@ -290,6 +307,9 @@ int main(int argc, char **argv)
     std::fill(message, message + align_size, 0);
 
     std::unique_ptr<void, decltype(&free)> mem_ptr(mem, &free);
+
+    // TODO: remove later
+    std::vector<std::pair<int, int>> subarray_indices = find_subarray_indices(message_size);
 
     // Perform warmup
     for (std::size_t i = 0; i < print_interval; i++)
