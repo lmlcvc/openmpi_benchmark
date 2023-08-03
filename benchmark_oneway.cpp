@@ -82,11 +82,14 @@ void print_discrete(std::size_t message_size, double throughput)
 
 // Function to perform round-trip communication between two processes
 void perform_rt_communication(int8_t *message, std::size_t message_size, std::size_t chunk_size, std::size_t chunk_count,
-                              int8_t rank, std::size_t print_interval,
-                              std::vector<MPI_Request> &send_requests, std::vector<MPI_Request> &recv_requests,
-                              std::vector<MPI_Status> &send_statuses, std::vector<MPI_Status> &recv_statuses)
+                              int8_t rank, std::size_t print_interval)
 {
     // FIXME: waitall left hanging
+
+    std::vector<MPI_Request> send_requests(print_interval * chunk_count);
+    std::vector<MPI_Request> recv_requests(print_interval * chunk_count);
+    std::vector<MPI_Status> send_statuses(print_interval * chunk_count);
+    std::vector<MPI_Status> recv_statuses(print_interval * chunk_count);
 
     if (rank == 0)
     {
@@ -115,9 +118,7 @@ void perform_rt_communication(int8_t *message, std::size_t message_size, std::si
 }
 
 void setup_continuous_communication(int8_t *message, std::size_t message_size, std::size_t chunk_size,
-                                    int8_t rank, std::size_t print_interval,
-                                    std::vector<MPI_Request> &send_requests, std::vector<MPI_Request> &recv_requests,
-                                    std::vector<MPI_Status> &send_statuses, std::vector<MPI_Status> &recv_statuses)
+                                    int8_t rank, std::size_t print_interval)
 {
     if (rank == 0)
         std::cout << "Message size: " << message_size << ", interval: " << print_interval << std::endl;
@@ -135,9 +136,7 @@ void setup_continuous_communication(int8_t *message, std::size_t message_size, s
 
     while (running)
     {
-        perform_rt_communication(message, message_size, chunk_size, chunk_count, rank, print_interval,
-                                 send_requests, recv_requests,
-                                 send_statuses, recv_statuses);
+        perform_rt_communication(message, message_size, chunk_size, chunk_count, rank, print_interval);
 
         clock_gettime(CLOCK_MONOTONIC, &end_time);
         timespec elapsed_time = diff(start_time, end_time);
@@ -160,9 +159,7 @@ void setup_continuous_communication(int8_t *message, std::size_t message_size, s
     }
 }
 
-void setup_discrete_communication(int8_t *message, std::size_t chunk_size, int8_t rank,
-                                  std::vector<MPI_Request> &send_requests, std::vector<MPI_Request> &recv_requests,
-                                  std::vector<MPI_Status> &send_statuses, std::vector<MPI_Status> &recv_statuses, std::size_t max_power = 22)
+void setup_discrete_communication(int8_t *message, std::size_t chunk_size, int8_t rank, std::size_t max_power = 22)
 {
     if (rank == 0)
     {
@@ -189,9 +186,7 @@ void setup_discrete_communication(int8_t *message, std::size_t chunk_size, int8_
 
         // Perform iteration_count sends for message of current_message_size
         for (std::size_t iteration = 0; iteration < iteration_count; iteration++)
-            perform_rt_communication(message, current_message_size, chunk_size, chunk_count, rank, iteration_count,
-                                     send_requests, recv_requests,
-                                     send_statuses, recv_statuses);
+            perform_rt_communication(message, current_message_size, chunk_size, chunk_count, rank, iteration_count);
 
         // Calculate and print average throughput for this message size
         clock_gettime(CLOCK_MONOTONIC, &end_time);
@@ -296,35 +291,21 @@ int main(int argc, char **argv)
 
     std::unique_ptr<void, decltype(&free)> mem_ptr(mem, &free);
 
-    // FIXME: initialise request/status arrays in setup communication funcitons
-    // chunk count will not always be the same bc of scan
-    // so it makes no sense that this is fixed
-    std::vector<MPI_Request> send_requests(print_interval * chunk_count);
-    std::vector<MPI_Request> recv_requests(print_interval * chunk_count);
-    std::vector<MPI_Status> send_statuses(print_interval * chunk_count);
-    std::vector<MPI_Status> recv_statuses(print_interval * chunk_count);
-
     // Perform warmup
     for (std::size_t i = 0; i < print_interval; i++)
         perform_rt_communication(message, message_size, chunk_size, message_size / chunk_size, // TODO: rewrite warmup to use few big chunks
-                                 rank, print_interval,
-                                 send_requests, recv_requests,
-                                 send_statuses, recv_statuses);
+                                 rank, print_interval);
 
     // Run program
     clock_gettime(CLOCK_MONOTONIC, &run_start_time);
 
     if (continuous_send)
     {
-        setup_continuous_communication(message, message_size, chunk_size, rank, print_interval,
-                                       send_requests, recv_requests,
-                                       send_statuses, recv_statuses);
+        setup_continuous_communication(message, message_size, chunk_size, rank, print_interval);
     }
     else
     {
-        setup_discrete_communication(message, chunk_size, rank,
-                                     send_requests, recv_requests,
-                                     send_statuses, recv_statuses);
+        setup_discrete_communication(message, chunk_size, rank);
     }
 
     // Finalise program
