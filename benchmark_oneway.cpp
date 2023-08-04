@@ -19,7 +19,7 @@
 /*
 send smaller chunks
 1.1. array is multiple of what I’m sending
-1.2. the chunks should be sent from and recieved from circular buffer
+1.2. the chunks should be sent from and recieved from circular buffer           // FIXME: circular buffer
 1.3. warmup: send bigger chunks, make them overlap
 */
 
@@ -103,7 +103,7 @@ void perform_warmup(int8_t *message, std::vector<std::pair<int, int>> subarray_i
     std::size_t subarray_size;
 
     if (rank == 0)
-        std::cout << "Performing warmup...";
+        std::cout << "\nPerforming warmup...";
 
     if (rank == 0)
     {
@@ -123,15 +123,14 @@ void perform_warmup(int8_t *message, std::vector<std::pair<int, int>> subarray_i
     }
 
     if (rank == 0)
-        std::cout << "Done." << std::endl;
+        std::cout << "Done.\n"
+                  << std::endl;
 }
 
 // Function to perform round-trip communication between two processes
 void perform_rt_communication(int8_t *message, std::size_t message_size, std::size_t chunk_size, std::size_t chunk_count,
                               int8_t rank, std::size_t print_interval)
 {
-    // FIXME: waitall left hanging
-
     std::vector<MPI_Request> requests(chunk_count);
     std::vector<MPI_Status> statuses(chunk_count);
 
@@ -165,7 +164,10 @@ void setup_continuous_communication(int8_t *message, std::size_t message_size, s
                                     int8_t rank, std::size_t print_interval)
 {
     if (rank == 0)
-        std::cout << "Message size: " << message_size << ", interval: " << print_interval << std::endl;
+        std::cout << "Message size [B]: " << message_size << std::endl
+                  << "Chunk size [B]: " << chunk_size << std::endl
+                  << "Interval: " << print_interval << "\n"
+                  << std::endl;
 
     std::size_t message_count = 0;
     bool running = true;
@@ -189,7 +191,8 @@ void setup_continuous_communication(int8_t *message, std::size_t message_size, s
         double avg_rtt = elapsed_secs / print_interval;
         double avg_throughput = (print_interval * message_size * 8.0) / (elapsed_secs * 1e6);
 
-        print_continuous(avg_rtt, avg_throughput);
+        if (rank == 0)
+            print_continuous(avg_rtt, avg_throughput);
 
         // Reset counters
         clock_gettime(CLOCK_MONOTONIC, &start_time);
@@ -258,7 +261,6 @@ int main(int argc, char **argv)
 
     std::size_t min_message_size = 10e4; // ?
     std::size_t min_interval = 10e5;
-    std::size_t min_chunk_size = 10e4;
     std::size_t max_power = 22;
 
     std::signal(SIGINT, sigintHandler);
@@ -301,10 +303,7 @@ int main(int argc, char **argv)
         case 'c':
             if (!continuous_send)
                 break;
-            tmp = std::stoi(optarg);
-            // TODO: min 1 chunk (size must match message size)
-            // TODO: default: 1 chunk
-            chunk_size = (tmp >= min_chunk_size) ? tmp : min_chunk_size;
+            chunk_size = std::stoi(optarg); //(tmp >= min_chunk_size) ? tmp : min_chunk_size;
             break;
 
         case 'h':
@@ -315,6 +314,13 @@ int main(int argc, char **argv)
             MPI_Finalize();
             return 1;
         }
+    }
+
+    // Validate chunk size
+    if (chunk_size > message_size)
+    {
+        chunk_size = message_size;
+        std::cout << "Chunk size cannot be greater than message size. Defaulting to no chunks." << std::endl;
     }
 
     // Allocate memory with desired alignment
@@ -339,9 +345,6 @@ int main(int argc, char **argv)
 
     // Perform warmup
     perform_warmup(message, subarray_indices, rank);
-    /*for (std::size_t i = 0; i < print_interval; i++)
-        perform_rt_communication(message, message_size, chunk_size, message_size / chunk_size, // TODO: rewrite warmup to use few big chunks
-                                 rank, print_interval);*/
 
     // Run program
     clock_gettime(CLOCK_MONOTONIC, &run_start_time);
