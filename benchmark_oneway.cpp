@@ -97,6 +97,35 @@ void print_discrete(std::size_t message_size, double throughput)
               << " |\n";
 }
 
+void perform_warmup(int8_t *message, std::vector<std::pair<int, int>> subarray_indices, int8_t rank)
+{
+    std::size_t subarray_count = subarray_indices.size();
+    std::size_t subarray_size;
+
+    if (rank == 0)
+        std::cout << "Performing warmup...";
+
+    if (rank == 0)
+    {
+        for (int i = 0; i < subarray_count; i++)
+        {
+            subarray_size = subarray_indices[i].second - subarray_indices[i].first + 1;
+            MPI_Send(&message[subarray_indices[i].first], subarray_size, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
+        }
+    }
+    else if (rank == 1)
+    {
+        for (int i = 0; i < subarray_count; i++)
+        {
+            subarray_size = subarray_indices[i].second - subarray_indices[i].first + 1;
+            MPI_Recv(&message[subarray_indices[i].first], subarray_size, MPI_BYTE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        }
+    }
+
+    if (rank == 0)
+        std::cout << "Done." << std::endl;
+}
+
 // Function to perform round-trip communication between two processes
 void perform_rt_communication(int8_t *message, std::size_t message_size, std::size_t chunk_size, std::size_t chunk_count,
                               int8_t rank, std::size_t print_interval)
@@ -309,9 +338,10 @@ int main(int argc, char **argv)
     std::vector<std::pair<int, int>> subarray_indices = find_subarray_indices(message_size);
 
     // Perform warmup
-    for (std::size_t i = 0; i < print_interval; i++)
+    perform_warmup(message, subarray_indices, rank);
+    /*for (std::size_t i = 0; i < print_interval; i++)
         perform_rt_communication(message, message_size, chunk_size, message_size / chunk_size, // TODO: rewrite warmup to use few big chunks
-                                 rank, print_interval);
+                                 rank, print_interval);*/
 
     // Run program
     clock_gettime(CLOCK_MONOTONIC, &run_start_time);
