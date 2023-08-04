@@ -13,6 +13,7 @@
 #include <cmath>
 #include <csignal>
 #include <vector>
+#include <cstring>
 
 // FIXME: sigint capture not making error but not working
 
@@ -134,6 +135,10 @@ void perform_rt_communication(int8_t *message, std::size_t message_size, std::si
     std::vector<MPI_Request> requests(chunk_count);
     std::vector<MPI_Status> statuses(chunk_count);
 
+    const std::size_t buffer_size = 10; // Circular buffer size
+    int8_t *buffer = new int8_t[buffer_size * chunk_size];
+    int buffer_index = 0;
+
     if (rank == 0)
     {
         for (std::size_t i = 0; i < print_interval; i++)
@@ -144,20 +149,43 @@ void perform_rt_communication(int8_t *message, std::size_t message_size, std::si
                 MPI_Isend(&message[offset], chunk_size, MPI_BYTE, 1, 0, MPI_COMM_WORLD, &requests[chunk]);
             }
             MPI_Waitall(chunk_count, requests.data(), statuses.data());
+
+            // Store data in the circular buffer
+            std::size_t buffer_offset = buffer_index * chunk_size;
+            for (std::size_t chunk = 0; chunk < chunk_count; chunk++)
+            {
+                std::size_t message_offset = chunk * chunk_size;
+                std::memcpy(&buffer[buffer_offset + message_offset], &message[message_offset], chunk_size);
+            }
+
+            buffer_index = (buffer_index + 1) % buffer_size;
         }
     }
     else if (rank == 1)
     {
         for (std::size_t i = 0; i < print_interval; i++)
         {
+            // Receive data from the circular buffer
+            std::size_t buffer_offset = buffer_index * chunk_size;
             for (std::size_t chunk = 0; chunk < chunk_count; chunk++)
             {
-                std::size_t offset = chunk * chunk_size;
-                MPI_Irecv(&message[offset], chunk_size, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &requests[chunk]);
+                std::size_t message_offset = chunk * chunk_size;
+                MPI_Irecv(&message[message_offset], chunk_size, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &requests[chunk]);
             }
+            MPI_Waitall(chunk_count, requests.data(), statuses.data());
+
+            // Use data from the buffer
+            for (std::size_t chunk = 0; chunk < chunk_count; chunk++)
+            {
+                std::size_t message_offset = chunk * chunk_size;
+                std::memcpy(&message[message_offset], &buffer[buffer_offset + message_offset], chunk_size);
+            }
+
+            buffer_index = (buffer_index + 1) % buffer_size;
         }
-        MPI_Waitall(chunk_count, requests.data(), statuses.data());
     }
+
+    delete[] buffer;
 }
 
 void setup_continuous_communication(int8_t *message, std::size_t message_size, std::size_t chunk_size,
