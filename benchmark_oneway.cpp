@@ -103,34 +103,32 @@ void perform_rt_communication(int8_t *message, std::size_t message_size, std::si
 {
     // FIXME: waitall left hanging
 
-    std::vector<MPI_Request> send_requests(print_interval * chunk_count);
-    std::vector<MPI_Request> recv_requests(print_interval * chunk_count);
-    std::vector<MPI_Status> send_statuses(print_interval * chunk_count);
-    std::vector<MPI_Status> recv_statuses(print_interval * chunk_count);
+    std::vector<MPI_Request> requests(chunk_count);
+    std::vector<MPI_Status> statuses(chunk_count);
 
     if (rank == 0)
     {
         for (std::size_t i = 0; i < print_interval; i++)
         {
-            for (std::size_t chunk = 1; chunk <= chunk_count; chunk++)
+            for (std::size_t chunk = 0; chunk < chunk_count; chunk++)
             {
-                std::size_t offset = (chunk - 1) * chunk_size;
-                MPI_Isend(&message[offset], chunk_size, MPI_BYTE, 1, 0, MPI_COMM_WORLD, &send_requests[i]);
+                std::size_t offset = chunk * chunk_size;
+                MPI_Isend(&message[offset], chunk_size, MPI_BYTE, 1, 0, MPI_COMM_WORLD, &requests[chunk]);
             }
-            MPI_Waitall(print_interval * chunk_count, send_requests.data(), send_statuses.data());
+            MPI_Waitall(chunk_count, requests.data(), statuses.data());
         }
     }
     else if (rank == 1)
     {
         for (std::size_t i = 0; i < print_interval; i++)
         {
-            for (std::size_t chunk = 1; chunk <= chunk_count; chunk++)
+            for (std::size_t chunk = 0; chunk < chunk_count; chunk++)
             {
-                std::size_t offset = (chunk - 1) * chunk_size;
-                MPI_Irecv(&message[offset], chunk_size, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &recv_requests[i]);
+                std::size_t offset = chunk * chunk_size;
+                MPI_Irecv(&message[offset], chunk_size, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &requests[chunk]);
             }
         }
-        MPI_Waitall(print_interval * chunk_count, recv_requests.data(), recv_statuses.data());
+        MPI_Waitall(chunk_count, requests.data(), statuses.data());
     }
 }
 
@@ -308,7 +306,6 @@ int main(int argc, char **argv)
 
     std::unique_ptr<void, decltype(&free)> mem_ptr(mem, &free);
 
-    // TODO: remove later
     std::vector<std::pair<int, int>> subarray_indices = find_subarray_indices(message_size);
 
     // Perform warmup
