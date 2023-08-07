@@ -17,13 +17,6 @@
 
 // FIXME: sigint capture not making error but not working
 
-/*
-send smaller chunks
-1.1. array is multiple of what I’m sending
-1.2. the chunks should be sent from and recieved from circular buffer           // FIXME: circular buffer
-1.3. warmup: send bigger chunks, make them overlap
-*/
-
 volatile sig_atomic_t sigintReceived = 0; // indicate if SIGINT has been received
 timespec run_start_time;                  // time of run start once program is set up
 
@@ -129,15 +122,15 @@ void perform_warmup(int8_t *message, std::vector<std::pair<int, int>> subarray_i
 }
 
 // Function to perform round-trip communication between two processes
-void perform_rt_communication(int8_t *message, std::size_t message_size, std::size_t chunk_size, std::size_t chunk_count,
+void perform_rt_communication(std::vector<int8_t> &buffer, std::size_t buffer_size,
+                              int8_t *message, std::size_t message_size,
+                              std::size_t chunk_size, std::size_t chunk_count,
                               int8_t rank, std::size_t print_interval)
 {
     std::vector<MPI_Request> requests(chunk_count);
     std::vector<MPI_Status> statuses(chunk_count);
 
-    const std::size_t buffer_size = 10; // Circular buffer size
-    int8_t *buffer = new int8_t[buffer_size * chunk_size];
-    int buffer_index = 0;
+    std::size_t buffer_index = 0;
 
     if (rank == 0)
     {
@@ -185,10 +178,11 @@ void perform_rt_communication(int8_t *message, std::size_t message_size, std::si
         }
     }
 
-    delete[] buffer;
+    // delete[] buffer;
 }
 
-void setup_continuous_communication(int8_t *message, std::size_t message_size, std::size_t chunk_size,
+void setup_continuous_communication(std::vector<int8_t> &buffer, std::size_t buffer_size,
+                                    int8_t *message, std::size_t message_size, std::size_t chunk_size,
                                     int8_t rank, std::size_t print_interval)
 {
     if (rank == 0)
@@ -210,7 +204,7 @@ void setup_continuous_communication(int8_t *message, std::size_t message_size, s
 
     while (running)
     {
-        perform_rt_communication(message, message_size, chunk_size, chunk_count, rank, print_interval);
+        perform_rt_communication(buffer, buffer_size, message, message_size, chunk_size, chunk_count, rank, print_interval);
 
         clock_gettime(CLOCK_MONOTONIC, &end_time);
         timespec elapsed_time = diff(start_time, end_time);
@@ -234,7 +228,9 @@ void setup_continuous_communication(int8_t *message, std::size_t message_size, s
     }
 }
 
-void setup_discrete_communication(int8_t *message, std::size_t chunk_size, int8_t rank, std::size_t max_power = 22)
+void setup_discrete_communication(std::vector<int8_t> &buffer, std::size_t buffer_size,
+                                  int8_t *message, std::size_t chunk_size,
+                                  int8_t rank, std::size_t max_power = 22)
 {
     if (rank == 0)
     {
@@ -261,7 +257,7 @@ void setup_discrete_communication(int8_t *message, std::size_t chunk_size, int8_
 
         // Perform iteration_count sends for message of current_message_size
         for (std::size_t iteration = 0; iteration < iteration_count; iteration++)
-            perform_rt_communication(message, current_message_size, chunk_size, chunk_count, rank, iteration_count);
+            perform_rt_communication(buffer, buffer_size, message, current_message_size, chunk_size, chunk_count, rank, iteration_count);
 
         // Calculate and print average throughput for this message size
         clock_gettime(CLOCK_MONOTONIC, &end_time);
@@ -282,9 +278,10 @@ int main(int argc, char **argv)
 {
     int rank, size;
 
-    std::size_t message_size = 10e6;   // message size in bytes
-    std::size_t print_interval = 10e4; // communication steps to be printed
-    std::size_t chunk_size = 10e5;     // chunk size in bytes
+    std::size_t message_size = 10e6;    // message size in bytes
+    std::size_t print_interval = 10e4;  // communication steps to be printed
+    std::size_t chunk_size = 10e5;      // chunk size in bytes
+    std::size_t buffer_size = 10;       // circular buffer size (in chunk count)
     bool continuous_send = true;
 
     std::size_t min_message_size = 10e4; // ?
@@ -309,7 +306,7 @@ int main(int argc, char **argv)
     // Process command line arguments
     int opt;
     std::size_t tmp;
-    while ((opt = getopt(argc, argv, "m:i:c:sh")) != -1)
+    while ((opt = getopt(argc, argv, "m:i:c:b:sh")) != -1)
     {
         switch (opt)
         {
@@ -331,14 +328,18 @@ int main(int argc, char **argv)
         case 'c':
             if (!continuous_send)
                 break;
-            chunk_size = std::stoi(optarg); //(tmp >= min_chunk_size) ? tmp : min_chunk_size;
+            chunk_size = std::stoi(optarg);
             break;
-
+        case 'b':
+            tmp = std::stoi(optarg);
+            if (tmp > 0)
+                buffer_size = tmp;
         case 'h':
         default:
             if (rank == 0)
                 std::cout << "Usage:" << argv[0] << std::endl
-                          << "\t-m <message-size>\n\t-i <print-interval>\n\t-s perform scan\n\t-h <help>" << std::endl;
+                          << "\t-m <message-size>\n\t-i <print-interval>\n\t-c<chunk-size>\n\t" << std::endl
+                          << "-b <buffer-size> [chunks]\n\t - s perform scan\n\t -h<help> " << std::endl;
             MPI_Finalize();
             return 1;
         }
@@ -371,6 +372,9 @@ int main(int argc, char **argv)
 
     std::vector<std::pair<int, int>> subarray_indices = find_subarray_indices(message_size);
 
+    // Define the storage buffer outside as a std::vector
+    std::vector<int8_t> buffer(buffer_size * chunk_size);
+
     // Perform warmup
     perform_warmup(message, subarray_indices, rank);
 
@@ -379,11 +383,11 @@ int main(int argc, char **argv)
 
     if (continuous_send)
     {
-        setup_continuous_communication(message, message_size, chunk_size, rank, print_interval);
+        setup_continuous_communication(buffer, buffer_size, message, message_size, chunk_size, rank, print_interval);
     }
     else
     {
-        setup_discrete_communication(message, chunk_size, rank);
+        setup_discrete_communication(buffer, buffer_size, message, chunk_size, rank);
     }
 
     // Finalise program
