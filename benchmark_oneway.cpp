@@ -16,6 +16,7 @@
 #include <cstring>
 
 // FIXME: sigint capture not making error but not working
+// TODO: look at number of messages/chunks being sent in an interval, lasts too long
 
 volatile sig_atomic_t sigintReceived = 0; // indicate if SIGINT has been received
 timespec run_start_time;                  // time of run start once program is set up
@@ -69,6 +70,17 @@ void print_elapsed()
     std::cout << "Total elapsed time: " << elapsed_seconds << " s" << std::endl;
 }
 
+std::pair<double, double> calculate_throughput(timespec start_time, timespec end_time, std::size_t message_size, std::size_t interval)
+{
+    timespec elapsed_time = diff(start_time, end_time);
+    double elapsed_secs = elapsed_time.tv_sec + (elapsed_time.tv_nsec / 1e9);
+
+    double avg_rtt = elapsed_secs / interval;
+    double avg_throughput = (interval * message_size * 8.0) / (elapsed_secs * 1e6);
+
+    return std::make_pair(avg_rtt, avg_throughput);
+}
+
 // Functions for formatted throughput info printing
 void print_continuous(double rtt, double throughput)
 {
@@ -97,7 +109,7 @@ void perform_warmup(int8_t *message, std::vector<std::pair<int, int>> subarray_i
     std::size_t subarray_size;
 
     if (rank == 0)
-        std::cout << "\nPerforming warmup...";
+        std::cout << "Performing warmup...";
 
     if (rank == 0)
     {
@@ -117,8 +129,7 @@ void perform_warmup(int8_t *message, std::vector<std::pair<int, int>> subarray_i
     }
 
     if (rank == 0)
-        std::cout << "Done.\n"
-                  << std::endl;
+        std::cout << "Done." << std::endl;
 }
 
 // Function to perform round-trip communication between two processes
@@ -152,6 +163,8 @@ void perform_rt_communication(std::vector<int8_t> &buffer, std::size_t buffer_si
             }
 
             buffer_index = (buffer_index + 1) % buffer_size;
+
+            MPI_Barrier(MPI_COMM_WORLD);
         }
     }
     else if (rank == 1)
@@ -175,10 +188,10 @@ void perform_rt_communication(std::vector<int8_t> &buffer, std::size_t buffer_si
             }
 
             buffer_index = (buffer_index + 1) % buffer_size;
+
+            MPI_Barrier(MPI_COMM_WORLD);
         }
     }
-
-    // delete[] buffer;
 }
 
 void setup_continuous_communication(std::vector<int8_t> &buffer, std::size_t buffer_size,
@@ -191,6 +204,8 @@ void setup_continuous_communication(std::vector<int8_t> &buffer, std::size_t buf
                   << "Interval: " << print_interval << "\n"
                   << std::endl;
 
+    double avg_rtt;
+    double avg_throughput;
     std::size_t message_count = 0;
     bool running = true;
 
@@ -207,11 +222,7 @@ void setup_continuous_communication(std::vector<int8_t> &buffer, std::size_t buf
         perform_rt_communication(buffer, buffer_size, message, message_size, chunk_size, chunk_count, rank, print_interval);
 
         clock_gettime(CLOCK_MONOTONIC, &end_time);
-        timespec elapsed_time = diff(start_time, end_time);
-        double elapsed_secs = elapsed_time.tv_sec + (elapsed_time.tv_nsec / 1e9);
-
-        double avg_rtt = elapsed_secs / print_interval;
-        double avg_throughput = (print_interval * message_size * 8.0) / (elapsed_secs * 1e6);
+        std::tie(avg_rtt, avg_throughput) = calculate_throughput(start_time, end_time, message_size, print_interval);
 
         if (rank == 0)
             print_continuous(avg_rtt, avg_throughput);
@@ -241,6 +252,7 @@ void setup_discrete_communication(std::vector<int8_t> &buffer, std::size_t buffe
         std::cout << "--------------------------------------\n";
     }
 
+    double avg_throughput;
     timespec end_time;
     timespec start_time;
 
@@ -261,10 +273,7 @@ void setup_discrete_communication(std::vector<int8_t> &buffer, std::size_t buffe
 
         // Calculate and print average throughput for this message size
         clock_gettime(CLOCK_MONOTONIC, &end_time);
-        timespec elapsed_time = diff(start_time, end_time);
-        double elapsed_secs = elapsed_time.tv_sec + (elapsed_time.tv_nsec / 1e9);
-
-        double avg_throughput = (iteration_count * current_message_size * 8.0) / (elapsed_secs * 1e6);
+        std::tie(std::ignore, avg_throughput) = calculate_throughput(start_time, end_time, current_message_size, iteration_count);
 
         if (rank == 0)
             print_discrete(current_message_size, avg_throughput);
@@ -278,13 +287,14 @@ int main(int argc, char **argv)
 {
     int rank, size;
 
-    std::size_t message_size = 10e6;    // message size in bytes
-    std::size_t print_interval = 10e4;  // communication steps to be printed
-    std::size_t chunk_size = 10e5;      // chunk size in bytes
-    std::size_t buffer_size = 10;       // circular buffer size (in chunk count)
+    std::size_t message_size = 10e6;     // message size in bytes
+    std::size_t print_interval = 10e4;   // communication steps to be printed
+    std::size_t chunk_size = 10e5;       // chunk size in bytes
+    std::size_t buffer_size = 10;        // circular buffer size (in chunk count)
+    std::size_t warmup_iterations = 100; // iteration count for warmup-related throughput calculation
     bool continuous_send = true;
 
-    std::size_t min_message_size = 10e4; // ?
+    std::size_t min_message_size = 10e4;
     std::size_t min_interval = 10e5;
     std::size_t max_power = 22;
 
@@ -306,7 +316,7 @@ int main(int argc, char **argv)
     // Process command line arguments
     int opt;
     std::size_t tmp;
-    while ((opt = getopt(argc, argv, "m:i:c:b:sh")) != -1)
+    while ((opt = getopt(argc, argv, "m:i:c:b:w:sh")) != -1)
     {
         switch (opt)
         {
@@ -334,12 +344,17 @@ int main(int argc, char **argv)
             tmp = std::stoi(optarg);
             if (tmp > 0)
                 buffer_size = tmp;
+        case 'w':
+            tmp = std::stoi(optarg);
+            if (tmp > 0)
+                warmup_iterations = tmp;
         case 'h':
         default:
             if (rank == 0)
                 std::cout << "Usage:" << argv[0] << std::endl
-                          << "\t-m <message-size>\n\t-i <print-interval>\n\t-c<chunk-size>\n\t" << std::endl
-                          << "-b <buffer-size> [chunks]\n\t - s perform scan\n\t -h<help> " << std::endl;
+                          << "\t-m <message-size>\n\t-i <print-interval>\n\t-c <chunk-size>\n\t" << std::endl
+                          << "-b <buffer-size> [chunks]\n\t-w <warmup-throughput-iterations>"
+                          << "-s perform scan\n\t -h help" << std::endl;
             MPI_Finalize();
             return 1;
         }
@@ -376,7 +391,29 @@ int main(int argc, char **argv)
     std::vector<int8_t> buffer(buffer_size * chunk_size);
 
     // Perform warmup
+    timespec warmup_start_time, warmup_end_time;
+    double warmup_throughput;
+
+    clock_gettime(CLOCK_MONOTONIC, &warmup_start_time);
+    perform_rt_communication(buffer, buffer_size,
+                             message, message_size, chunk_size, message_size / chunk_size,
+                             rank, warmup_iterations);
+    clock_gettime(CLOCK_MONOTONIC, &warmup_end_time);
+    std::tie(std::ignore, warmup_throughput) = calculate_throughput(warmup_start_time, warmup_end_time, message_size, warmup_iterations);
+    if (rank == 0)
+        std::cout << "\nPre-warmup throughput: " << warmup_throughput << " Mbit/s" << std::endl;
+
     perform_warmup(message, subarray_indices, rank);
+
+    clock_gettime(CLOCK_MONOTONIC, &warmup_start_time);
+    perform_rt_communication(buffer, buffer_size,
+                             message, message_size, chunk_size, message_size / chunk_size,
+                             rank, warmup_iterations);
+    clock_gettime(CLOCK_MONOTONIC, &warmup_end_time);
+    std::tie(std::ignore, warmup_throughput) = calculate_throughput(warmup_start_time, warmup_end_time, message_size, warmup_iterations);
+    if (rank == 0)
+        std::cout << "Post-warmup throughput: " << warmup_throughput << " Mbit/s\n"
+                  << std::endl;
 
     // Run program
     clock_gettime(CLOCK_MONOTONIC, &run_start_time);
