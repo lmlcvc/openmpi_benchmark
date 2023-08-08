@@ -16,7 +16,7 @@
 #include <cstring>
 
 // FIXME: sigint capture not making error but not working
-// TODO: look at number of messages/chunks being sent in an interval, lasts too long
+// FIXME: look at number of messages/chunks being sent in an interval, lasts too long
 
 volatile sig_atomic_t sigintReceived = 0; // indicate if SIGINT has been received
 timespec run_start_time;                  // time of run start once program is set up
@@ -33,7 +33,7 @@ timespec diff(timespec start, timespec end)
     if ((end.tv_nsec - start.tv_nsec) < 0)
     {
         time_diff.tv_sec = end.tv_sec - start.tv_sec - 1;
-        time_diff.tv_nsec = 1000000000 + end.tv_nsec - start.tv_nsec;
+        time_diff.tv_nsec = 1e9 + end.tv_nsec - start.tv_nsec;
     }
     else
     {
@@ -58,6 +58,59 @@ std::vector<std::pair<int, int>> find_subarray_indices(int message_size)
     }
 
     return subarray_indices;
+}
+
+void parse_arguments(int argc, char **argv, int rank, std::size_t min_message_size, std::size_t min_interval,
+                     bool &continuous_send, std::size_t &message_size, std::size_t &print_interval,
+                     std::size_t &chunk_size, std::size_t &buffer_size, std::size_t &warmup_iterations)
+{
+    int opt;
+    std::size_t tmp;
+    while ((opt = getopt(argc, argv, "m:i:c:b:w:sh")) != -1)
+    {
+        switch (opt)
+        {
+        case 's':
+            continuous_send = false;
+            break;
+        case 'm':
+            if (!continuous_send)
+                break;
+            tmp = std::stoi(optarg);
+            message_size = (tmp >= min_message_size) ? tmp : min_message_size;
+            break;
+        case 'i':
+            if (!continuous_send)
+                break;
+            tmp = std::stoi(optarg);
+            print_interval = (tmp >= min_interval) ? tmp : min_interval;
+            break;
+        case 'c':
+            if (!continuous_send)
+                break;
+            chunk_size = std::stoi(optarg);
+            break;
+        case 'b':
+            tmp = std::stoi(optarg);
+            if (tmp > 0)
+                buffer_size = tmp;
+            break;
+        case 'w':
+            tmp = std::stoi(optarg);
+            if (tmp > 0)
+                warmup_iterations = tmp;
+            break;
+        case 'h':
+        default:
+            if (rank == 0)
+                std::cout << "Usage: " << argv[0] << std::endl
+                          << "\t-m <message-size>\n\t-i <print-interval>\n\t-c <chunk-size>\n\t"
+                          << "-b <chunks in buffer>\n\t-w <iterations in warmup throughput>\n\t" // TODO: buffer size should be messages or memory
+                          << "-s perform scan\n\t-h help" << std::endl;
+            MPI_Finalize();
+            std::exit(1);
+        }
+    }
 }
 
 void print_elapsed()
@@ -136,31 +189,30 @@ void perform_warmup(int8_t *message, std::vector<std::pair<int, int>> subarray_i
 void perform_rt_communication(std::vector<int8_t> &buffer, std::size_t buffer_size,
                               int8_t *message, std::size_t message_size,
                               std::size_t chunk_size, std::size_t chunk_count,
-                              int8_t rank, std::size_t print_interval)
+                              int8_t rank, std::size_t interval)
 {
     std::vector<MPI_Request> requests(chunk_count);
     std::vector<MPI_Status> statuses(chunk_count);
 
+    // FIXME: a buffer for each rank
     std::size_t buffer_index = 0;
+    std::size_t message_offset, buffer_offset;
 
     if (rank == 0)
     {
-        for (std::size_t i = 0; i < print_interval; i++)
+        for (std::size_t i = 0; i < interval; i++)
         {
+            buffer_offset = buffer_index * chunk_size;
             for (std::size_t chunk = 0; chunk < chunk_count; chunk++)
             {
-                std::size_t offset = chunk * chunk_size;
-                MPI_Isend(&message[offset], chunk_size, MPI_BYTE, 1, 0, MPI_COMM_WORLD, &requests[chunk]);
-            }
-            MPI_Waitall(chunk_count, requests.data(), statuses.data());
+                message_offset = chunk * chunk_size;
+                MPI_Isend(&message[message_offset], chunk_size, MPI_BYTE, 1, 0, MPI_COMM_WORLD, &requests[chunk]);
 
-            // Store data in the circular buffer
-            std::size_t buffer_offset = buffer_index * chunk_size;
-            for (std::size_t chunk = 0; chunk < chunk_count; chunk++)
-            {
-                std::size_t message_offset = chunk * chunk_size;
-                std::memcpy(&buffer[buffer_offset + message_offset], &message[message_offset], chunk_size);
+                // Use data from the buffer
+                std::memcpy(&message[message_offset], &buffer[buffer_offset + message_offset], chunk_size);
             }
+            // FIXME: wait for whole message, put it into buffer instead of chunk by chunk
+            MPI_Waitall(chunk_count, requests.data(), statuses.data());
 
             buffer_index = (buffer_index + 1) % buffer_size;
 
@@ -169,23 +221,19 @@ void perform_rt_communication(std::vector<int8_t> &buffer, std::size_t buffer_si
     }
     else if (rank == 1)
     {
-        for (std::size_t i = 0; i < print_interval; i++)
+        for (std::size_t i = 0; i < interval; i++)
         {
             // Receive data from the circular buffer
-            std::size_t buffer_offset = buffer_index * chunk_size;
+            buffer_offset = buffer_index * chunk_size;
             for (std::size_t chunk = 0; chunk < chunk_count; chunk++)
             {
-                std::size_t message_offset = chunk * chunk_size;
+                message_offset = chunk * chunk_size;
                 MPI_Irecv(&message[message_offset], chunk_size, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &requests[chunk]);
+
+                // Store data in the circular buffer
+                std::memcpy(&buffer[buffer_offset + message_offset], &message[message_offset], chunk_size);
             }
             MPI_Waitall(chunk_count, requests.data(), statuses.data());
-
-            // Use data from the buffer
-            for (std::size_t chunk = 0; chunk < chunk_count; chunk++)
-            {
-                std::size_t message_offset = chunk * chunk_size;
-                std::memcpy(&message[message_offset], &buffer[buffer_offset + message_offset], chunk_size);
-            }
 
             buffer_index = (buffer_index + 1) % buffer_size;
 
@@ -268,8 +316,8 @@ void setup_discrete_communication(std::vector<int8_t> &buffer, std::size_t buffe
         clock_gettime(CLOCK_MONOTONIC, &start_time);
 
         // Perform iteration_count sends for message of current_message_size
-        for (std::size_t iteration = 0; iteration < iteration_count; iteration++)
-            perform_rt_communication(buffer, buffer_size, message, current_message_size, chunk_size, chunk_count, rank, iteration_count);
+        // for (std::size_t iteration = 0; iteration < iteration_count; iteration++)
+        perform_rt_communication(buffer, buffer_size, message, current_message_size, chunk_size, chunk_count, rank, iteration_count);
 
         // Calculate and print average throughput for this message size
         clock_gettime(CLOCK_MONOTONIC, &end_time);
@@ -287,15 +335,15 @@ int main(int argc, char **argv)
 {
     int rank, size;
 
-    std::size_t message_size = 10e6;     // message size in bytes
-    std::size_t print_interval = 10e4;   // communication steps to be printed
-    std::size_t chunk_size = 10e5;       // chunk size in bytes
+    std::size_t message_size = 1e6;      // message size in bytes
+    std::size_t print_interval = 1e4;    // communication steps to be printed
+    std::size_t chunk_size = 1e5;        // chunk size in bytes
     std::size_t buffer_size = 10;        // circular buffer size (in chunk count)
     std::size_t warmup_iterations = 100; // iteration count for warmup-related throughput calculation
     bool continuous_send = true;
 
-    std::size_t min_message_size = 10e4;
-    std::size_t min_interval = 10e5;
+    std::size_t min_message_size = 1e4;
+    std::size_t min_interval = 1e5;
     std::size_t max_power = 22;
 
     std::signal(SIGINT, sigintHandler);
@@ -304,7 +352,7 @@ int main(int argc, char **argv)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    std::cout << "Hello from " << rank << std::endl;
+    std::cout << "Initialised rank " << rank << std::endl;
 
     if (size != 2)
     {
@@ -313,52 +361,8 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    // Process command line arguments
-    int opt;
-    std::size_t tmp;
-    while ((opt = getopt(argc, argv, "m:i:c:b:w:sh")) != -1)
-    {
-        switch (opt)
-        {
-        case 's':
-            continuous_send = false;
-            break;
-        case 'm':
-            if (!continuous_send)
-                break;
-            tmp = std::stoi(optarg);
-            message_size = (tmp >= min_message_size) ? tmp : min_message_size;
-            break;
-        case 'i':
-            if (!continuous_send)
-                break;
-            tmp = std::stoi(optarg);
-            print_interval = (tmp >= min_interval) ? tmp : min_interval;
-            break;
-        case 'c':
-            if (!continuous_send)
-                break;
-            chunk_size = std::stoi(optarg);
-            break;
-        case 'b':
-            tmp = std::stoi(optarg);
-            if (tmp > 0)
-                buffer_size = tmp;
-        case 'w':
-            tmp = std::stoi(optarg);
-            if (tmp > 0)
-                warmup_iterations = tmp;
-        case 'h':
-        default:
-            if (rank == 0)
-                std::cout << "Usage:" << argv[0] << std::endl
-                          << "\t-m <message-size>\n\t-i <print-interval>\n\t-c <chunk-size>\n\t" << std::endl
-                          << "-b <buffer-size> [chunks]\n\t-w <warmup-throughput-iterations>"
-                          << "-s perform scan\n\t -h help" << std::endl;
-            MPI_Finalize();
-            return 1;
-        }
-    }
+    parse_arguments(argc, argv, rank, min_message_size, min_interval,
+                    continuous_send, message_size, print_interval, chunk_size, buffer_size, warmup_iterations);
 
     // Validate chunk size
     if (chunk_size > message_size)
@@ -385,7 +389,7 @@ int main(int argc, char **argv)
 
     std::unique_ptr<void, decltype(&free)> mem_ptr(mem, &free);
 
-    std::vector<std::pair<int, int>> subarray_indices = find_subarray_indices(message_size);
+    std::vector<std::pair<int, int>> subarray_indices = find_subarray_indices(message_size);        // FIXME: causes segfault
 
     // Define the storage buffer outside as a std::vector
     std::vector<int8_t> buffer(buffer_size * chunk_size);
