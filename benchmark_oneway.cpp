@@ -19,6 +19,7 @@
 // FIXME: sigint capture not making error but not working
 // TODO: check for error status handling needs
 
+
 volatile sig_atomic_t sigintReceived = 0; // indicate if SIGINT has been received
 timespec run_start_time;                  // time of run start once program is set up
 
