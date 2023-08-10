@@ -3,9 +3,14 @@
 #include <csignal>
 #include <vector>
 #include <string>
+#include <memory>
 #include <mpi.h>
 
-volatile sig_atomic_t sigintReceived = 0; // indicate if SIGINT has been received
+#include "benchmark.h"
+#include "scan_benchmark.h"
+#include "continuous_benchmark.h"
+
+volatile sig_atomic_t sigintReceived = 0;
 timespec run_start_time;
 
 enum CommunicationType
@@ -15,7 +20,8 @@ enum CommunicationType
     COMM_CONTINUOUS = 'c'
 };
 
-struct ArgumentEntry {
+struct ArgumentEntry
+{
     char option;
     std::string value;
 };
@@ -29,23 +35,39 @@ void handleSignals(int signal)
 void parseArguments(int argc, char **argv, int rank, CommunicationType &commType, std::vector<ArgumentEntry> &commArguments)
 {
     int opt;
-    while ((opt = getopt(argc, argv, "m:i:c:b:w:sh")) != -1)
+    while ((opt = getopt(argc, argv, "m:i:b:w:sch")) != -1)
     {
         switch (opt)
         {
         case 's':
-            commType = COMM_SCAN;
-            commArguments.push_back({ 's', "" });
+            if (commType == COMM_UNDEFINED)
+            {
+                commType = COMM_SCAN;
+            }
+            else if (rank == 0)
+            {
+                std::cerr << "Cannot have multiple communication types" << std::endl;
+                MPI_Finalize();
+                std::exit(1);
+            }
             break;
         case 'c':
-            commType = COMM_CONTINUOUS;
-            commArguments.push_back({ 'c', "" });
+            if (commType == COMM_UNDEFINED)
+            {
+                commType = COMM_CONTINUOUS;
+            }
+            else if (rank == 0)
+            {
+                std::cerr << "Cannot have multiple communication types" << std::endl;
+                MPI_Finalize();
+                std::exit(1);
+            }
             break;
         case 'm':
         case 'i':
         case 'b':
         case 'w':
-            commArguments.push_back({ static_cast<char>(opt), optarg });
+            commArguments.push_back({static_cast<char>(opt), optarg});
             break;
         case 'h':
         default:
@@ -53,7 +75,7 @@ void parseArguments(int argc, char **argv, int rank, CommunicationType &commType
                 std::cout << "Usage: " << argv[0] << std::endl
                           << "\t-m <message-size>\n\t-i <print-interval>\n\t"
                           << "-b <messages in buffer>\n\t-w <iterations in warmup throughput>\n\t"
-                          << "-s perform scan\n\t-h help" << std::endl;
+                          << "-c continuous run\n\t-s perform scan\n\t-h help" << std::endl;
             MPI_Finalize();
             std::exit(1);
         }
@@ -66,12 +88,15 @@ int main(int argc, char **argv)
     CommunicationType commType = COMM_UNDEFINED;
     std::vector<ArgumentEntry> commArguments;
 
+    std::unique_ptr<Benchmark> benchmark;
+
     std::signal(SIGINT, handleSignals);
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
+    // Run setup
     std::cout << "Initialised rank " << rank << std::endl;
 
     if (size != 2)
@@ -81,9 +106,23 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    // Benchmark object initialisation
     parseArguments(argc, argv, rank, commType, commArguments);
-
-    // INIT DESIRED TYPE OF OBJECT
+    if (commType == COMM_SCAN)
+    {
+        benchmark = std::make_unique<ScanBenchmark>(argc, argv);
+    }
+    else if (commType == COMM_CONTINUOUS)
+    {
+        benchmark = std::make_unique<ContinuousBenchmark>(argc, argv);
+    }
+    else
+    {
+        if (rank == 0)
+            std::cerr << "Invalid communication type. Finishing." << std::endl;
+        MPI_Finalize();
+        return 1;
+    }
 
     // ALLOCATE MEMORY
 
