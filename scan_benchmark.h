@@ -6,14 +6,12 @@
 class ScanBenchmark : public Benchmark
 {
 public:
-    ScanBenchmark(int argc, char **argv);
+    ScanBenchmark(int argc, char **argv, int rank);
     virtual ~ScanBenchmark() override {}
-    void setup() override;
+    void setup(int rank) override;
     void run() override;
 
 private:
-    void allocateMemory() override;
-
     const std::size_t maxPower = 22;
 };
 

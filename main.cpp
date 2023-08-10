@@ -110,11 +110,11 @@ int main(int argc, char **argv)
     parseArguments(argc, argv, rank, commType, commArguments);
     if (commType == COMM_SCAN)
     {
-        benchmark = std::make_unique<ScanBenchmark>(argc, argv);
+        benchmark = std::make_unique<ScanBenchmark>(argc, argv, rank);
     }
     else if (commType == COMM_CONTINUOUS)
     {
-        benchmark = std::make_unique<ContinuousBenchmark>(argc, argv);
+        benchmark = std::make_unique<ContinuousBenchmark>(argc, argv, rank);
     }
     else
     {

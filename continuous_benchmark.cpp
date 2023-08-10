@@ -1,18 +1,16 @@
 #include "continuous_benchmark.h"
 
-ContinuousBenchmark::ContinuousBenchmark(int argc, char **argv) : Benchmark(argc, argv)
+ContinuousBenchmark::ContinuousBenchmark(int argc, char **argv, int rank) : Benchmark(argc, argv, rank)
 {
-    // Additional initialization specific to ScanBenchmark
+    m_rank = rank;
 }
 
-void ContinuousBenchmark::allocateMemory()
+void ContinuousBenchmark::setup(int rank)
 {
     m_alignSize = m_messageSize;
-}
+    allocateMemory(rank);
 
-void ContinuousBenchmark::setup()
-{
-    // Implementation of scan benchmark logic
+    // TODO: init vector of random message sizes
 }
 
 void ContinuousBenchmark::run()

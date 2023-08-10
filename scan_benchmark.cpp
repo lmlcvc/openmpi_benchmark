@@ -1,18 +1,15 @@
 #include "scan_benchmark.h"
 
-ScanBenchmark::ScanBenchmark(int argc, char **argv) : Benchmark(argc, argv)
+ScanBenchmark::ScanBenchmark(int argc, char **argv, int rank) : Benchmark(argc, argv, rank)
 {
-    // Additional initialization specific to ScanBenchmark
+    m_rank = rank;
 }
 
-void ScanBenchmark::allocateMemory()
+
+void ScanBenchmark::setup(int rank)
 {
     m_alignSize = static_cast<std::size_t>(std::pow(2, maxPower));
-}
-
-void ScanBenchmark::setup()
-{
-    // Implementation of scan benchmark logic
+    allocateMemory(rank);
 }
 
 void ScanBenchmark::run()

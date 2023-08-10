@@ -16,7 +16,7 @@ timespec Benchmark::diff(timespec start, timespec end)
     return time_diff;
 }
 
-void Benchmark::setup()
+void Benchmark::setup(int rank)
 {
     // Implementation for setup
 }
@@ -26,7 +26,15 @@ void Benchmark::run()
     // Implementation for run
 }
 
-void Benchmark::allocateMemory()
+void Benchmark::allocateMemory(int rank)
 {
-    // Implementation for allocateMemory
+    bufferSnd = static_cast<int8_t *>(memSnd);
+    bufferRcv = static_cast<int8_t *>(memRcv);
+    std::fill(bufferSnd, bufferSnd + m_alignSize, 0);
+
+    MPI_Bcast(&memSnd, sizeof(void *), MPI_BYTE, 0, MPI_COMM_WORLD);
+    std::unique_ptr<void, decltype(&free)> memSndPtr(rank == 0 ? memSnd : nullptr, &free);
+
+    MPI_Bcast(&memRcv, sizeof(void *), MPI_BYTE, 0, MPI_COMM_WORLD);
+    std::unique_ptr<void, decltype(&free)> memRcvPtr(rank == 0 ? memRcv : nullptr, &free);
 }
