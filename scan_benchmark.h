@@ -8,10 +8,13 @@ class ScanBenchmark : public Benchmark
 public:
     ScanBenchmark(int argc, char **argv, int rank);
     virtual ~ScanBenchmark() override {}
+
     void setup(int rank) override;
     void run() override;
 
 private:
+    void performWarmup() override;
+
     const std::size_t maxPower = 22;
 };
 

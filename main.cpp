@@ -74,7 +74,7 @@ void parseArguments(int argc, char **argv, int rank, CommunicationType &commType
             if (rank == 0)
                 std::cout << "Usage: " << argv[0] << std::endl
                           << "\t-m <message-size>\n\t-i <print-interval>\n\t"
-                          << "-b <messages in buffer>\n\t-w <iterations in warmup throughput>\n\t"
+                          << "-b <buffer-size> [messages]\n\t-w <iterations in warmup throughput>\n\t"
                           << "-c continuous run\n\t-s perform scan\n\t-h help" << std::endl;
             MPI_Finalize();
             std::exit(1);
