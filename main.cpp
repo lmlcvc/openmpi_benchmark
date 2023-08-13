@@ -120,13 +120,8 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    // ALLOCATE MEMORY
-
-    // Initialise message and data
-
-    // Perform warmup
-
     // Run program
+    benchmark->run();
 
     // Finalise program
     MPI_Finalize();

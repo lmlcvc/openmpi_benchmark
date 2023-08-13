@@ -50,9 +50,6 @@ void ContinuousBenchmark::parseArguments(std::vector<ArgumentEntry> args)
     }
 }
 
-void ContinuousBenchmark::performWarmup()
-{
-}
 
 void ContinuousBenchmark::allocateMemory()
 {

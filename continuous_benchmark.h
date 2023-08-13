@@ -14,7 +14,6 @@ public:
 protected:
     void parseArguments(std::vector<ArgumentEntry> args) override;
     void allocateMemory() override;
-    void performWarmup() override;
 
     const std::size_t minMessageSize = 1e4;
 

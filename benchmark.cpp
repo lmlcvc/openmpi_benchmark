@@ -47,6 +47,7 @@ std::pair<double, double> Benchmark::calculateThroughput(timespec startTime, tim
 
 std::size_t Benchmark::rtCommunication(std::size_t sndBufferSize, std::size_t rcvBufferSize, std::size_t messageSize, std::size_t iterations = -1)
 {
+    // FIXME: replace buffer size with buffer bytes
     if (iterations == -1)
         iterations = m_iterations;
     std::vector<MPI_Status> statuses(iterations);
@@ -55,8 +56,6 @@ std::size_t Benchmark::rtCommunication(std::size_t sndBufferSize, std::size_t rc
 
     if (m_rank == 0)
     {
-        // TODO: to adapt to variable size, change offset logic
-        // maybe store full buffer size in bytes somewhere
         for (std::size_t i = 0; i < iterations; i++)
         {
             if (sendOffset + messageSize > sndBufferSize * messageSize)
@@ -133,4 +132,30 @@ void Benchmark::warmupCommunication(int8_t *bufferSnd, std::vector<std::pair<int
 
     if (rank == 0)
         std::cout << "Done." << std::endl;
+}
+
+void Benchmark::performWarmup()
+{
+    timespec startTime, endTime;
+    double throughput;
+    std::size_t messageSize = m_sndBufferBytes / 10;
+
+    std::vector<std::pair<int, int>> subarrayIndices = findSubarrayIndices(m_sndBufferBytes);
+
+    clock_gettime(CLOCK_MONOTONIC, &startTime);
+    rtCommunication(m_sndBufferBytes, m_rcvBufferBytes, messageSize, m_warmupIterations);
+    clock_gettime(CLOCK_MONOTONIC, &endTime);
+    std::tie(std::ignore, throughput) = calculateThroughput(startTime, endTime, messageSize, m_warmupIterations);
+
+    std::cout << "\nPre-warmup throughput: " << throughput << " Mbit/s" << std::endl;
+
+    warmupCommunication(m_bufferSnd, subarrayIndices, m_rank);
+
+    clock_gettime(CLOCK_MONOTONIC, &startTime);
+    rtCommunication(m_sndBufferBytes, m_rcvBufferBytes, messageSize, m_warmupIterations);
+    clock_gettime(CLOCK_MONOTONIC, &endTime);
+    std::tie(std::ignore, throughput) = calculateThroughput(startTime, endTime, messageSize, m_warmupIterations);
+
+    std::cout << "Post-warmup throughput: " << throughput << " Mbit/s\n"
+              << std::endl;
 }

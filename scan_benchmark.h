@@ -13,7 +13,6 @@ public:
 
 private:
     void parseArguments(std::vector<ArgumentEntry> args) override;
-    void performWarmup() override;
     void allocateMemory() override;
 
     std::size_t m_maxPower = 22;

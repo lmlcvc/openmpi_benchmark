@@ -40,7 +40,7 @@ protected:
 
     virtual std::size_t rtCommunication(std::size_t sndBufferSize, std::size_t rcvBufferSize, std::size_t messageSize, std::size_t interval);
     virtual void warmupCommunication(int8_t *bufferSnd, std::vector<std::pair<int, int>> subarrayIndices, int8_t rank);
-    virtual void performWarmup() = 0;
+    void performWarmup();
 
     int m_rank;
 
