@@ -23,11 +23,11 @@ class Benchmark
 {
 public:
     virtual ~Benchmark() {}
-    virtual void setup(int rank) = 0;
+    virtual void setup() = 0;
     virtual void run() = 0;
 
 protected:
-    void allocateMemory(int rank);
+    void allocateMemory();
     std::vector<std::pair<int, int>> findSubarrayIndices(std::size_t messageSize);
     std::pair<double, double> calculateThroughput(timespec startTime, timespec endTime, std::size_t messageSize, std::size_t iterations);
 

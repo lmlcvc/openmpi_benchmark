@@ -9,7 +9,7 @@ public:
     ScanBenchmark(int argc, char **argv, int rank);
     virtual ~ScanBenchmark() override {}
 
-    void setup(int rank) override;
+    void setup() override;
     void run() override;
 
 private:

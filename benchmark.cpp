@@ -16,7 +16,7 @@ timespec diff(timespec start, timespec end)
     return time_diff;
 }
 
-void Benchmark::allocateMemory(int rank)
+void Benchmark::allocateMemory()
 {
     const long pageSize = sysconf(_SC_PAGESIZE);
     m_bufferSnd = static_cast<int8_t *>(memSnd);
@@ -33,10 +33,10 @@ void Benchmark::allocateMemory(int rank)
     }
 
     MPI_Bcast(&memSnd, sizeof(void *), MPI_BYTE, 0, MPI_COMM_WORLD);
-    std::unique_ptr<void, decltype(&free)> memSndPtr(rank == 0 ? memSnd : nullptr, &free);
+    std::unique_ptr<void, decltype(&free)> memSndPtr(m_rank == 0 ? memSnd : nullptr, &free);
 
     MPI_Bcast(&memRcv, sizeof(void *), MPI_BYTE, 0, MPI_COMM_WORLD);
-    std::unique_ptr<void, decltype(&free)> memRcvPtr(rank == 0 ? memRcv : nullptr, &free);
+    std::unique_ptr<void, decltype(&free)> memRcvPtr(m_rank == 0 ? memRcv : nullptr, &free);
 }
 
 std::vector<std::pair<int, int>> Benchmark::findSubarrayIndices(std::size_t messageSize)

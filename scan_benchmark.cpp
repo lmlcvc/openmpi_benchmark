@@ -34,10 +34,10 @@ void ScanBenchmark::performWarmup()
               << std::endl;
 }
 
-void ScanBenchmark::setup(int rank) // TODO: setup() not setup(int rank)
+void ScanBenchmark::setup() 
 {
     m_alignSize = static_cast<std::size_t>(std::pow(2, maxPower)); // FIXME: should be full size of buffer
-    allocateMemory(m_rank);
+    allocateMemory();
 }
 
 void ScanBenchmark::run()

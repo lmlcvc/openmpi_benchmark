@@ -10,10 +10,10 @@ void ContinuousBenchmark::performWarmup()
    
 }
 
-void ContinuousBenchmark::setup(int rank)
+void ContinuousBenchmark::setup()
 {
     m_alignSize = m_messageSize;
-    allocateMemory(rank);
+    allocateMemory();
 
     // TODO: init vector of random message sizes
 }
