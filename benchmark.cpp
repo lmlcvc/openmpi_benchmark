@@ -16,29 +16,6 @@ timespec diff(timespec start, timespec end)
     return time_diff;
 }
 
-void Benchmark::allocateMemory()
-{
-    const long pageSize = sysconf(_SC_PAGESIZE);
-    m_bufferSnd = static_cast<int8_t *>(memSnd);
-    m_bufferRcv = static_cast<int8_t *>(memRcv);
-    std::fill(m_bufferSnd, m_bufferRcv + m_alignSize * m_sndBufferSize, 0);
-
-    // TODO: align both buffers with respective align size
-    if (posix_memalign(&memSnd, pageSize, m_alignSize) != 0 && posix_memalign(&memRcv, pageSize, m_alignSize))
-    {
-        std::cerr << "Memory allocation failed" << std::endl;
-        MPI_Finalize();
-    std:
-        exit(1);
-    }
-
-    MPI_Bcast(&memSnd, sizeof(void *), MPI_BYTE, 0, MPI_COMM_WORLD);
-    std::unique_ptr<void, decltype(&free)> memSndPtr(m_rank == 0 ? memSnd : nullptr, &free);
-
-    MPI_Bcast(&memRcv, sizeof(void *), MPI_BYTE, 0, MPI_COMM_WORLD);
-    std::unique_ptr<void, decltype(&free)> memRcvPtr(m_rank == 0 ? memRcv : nullptr, &free);
-}
-
 std::vector<std::pair<int, int>> Benchmark::findSubarrayIndices(std::size_t messageSize)
 {
     int subarraySize = std::ceil(0.32 * messageSize);
@@ -78,6 +55,8 @@ std::size_t Benchmark::rtCommunication(std::size_t sndBufferSize, std::size_t rc
 
     if (m_rank == 0)
     {
+        // TODO: to adapt to variable size, change offset logic
+        // maybe store full buffer size in bytes somewhere
         for (std::size_t i = 0; i < iterations; i++)
         {
             if (sendOffset + messageSize > sndBufferSize * messageSize)

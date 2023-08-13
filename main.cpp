@@ -10,6 +10,8 @@
 #include "scan_benchmark.h"
 #include "continuous_benchmark.h"
 
+// FIXME: main hangs
+
 volatile sig_atomic_t sigintReceived = 0;
 timespec run_start_time;
 
@@ -18,12 +20,6 @@ enum CommunicationType
     COMM_UNDEFINED,
     COMM_SCAN = 's',
     COMM_CONTINUOUS = 'c'
-};
-
-struct ArgumentEntry
-{
-    char option;
-    std::string value;
 };
 
 void handleSignals(int signal)
@@ -110,11 +106,11 @@ int main(int argc, char **argv)
     parseArguments(argc, argv, rank, commType, commArguments);
     if (commType == COMM_SCAN)
     {
-        benchmark = std::make_unique<ScanBenchmark>(argc, argv, rank);
+        benchmark = std::make_unique<ScanBenchmark>(commArguments, rank);
     }
     else if (commType == COMM_CONTINUOUS)
     {
-        benchmark = std::make_unique<ContinuousBenchmark>(argc, argv, rank);
+        benchmark = std::make_unique<ContinuousBenchmark>(commArguments, rank);
     }
     else
     {
@@ -127,7 +123,6 @@ int main(int argc, char **argv)
     // ALLOCATE MEMORY
 
     // Initialise message and data
-    // TODO: replace with variable size message/buffer initialisation
 
     // Perform warmup
 

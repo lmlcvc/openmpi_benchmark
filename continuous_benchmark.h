@@ -6,17 +6,22 @@
 class ContinuousBenchmark : public Benchmark
 {
 public:
-    ContinuousBenchmark(int argc, char **argv, int rank);
+    ContinuousBenchmark(std::vector<ArgumentEntry> args, int rank);
     virtual ~ContinuousBenchmark() override {}
-    void setup() override;
+
     void run() override;
 
-private:
+protected:
+    void parseArguments(std::vector<ArgumentEntry> args) override;
+    void allocateMemory() override;
     void performWarmup() override;
 
     const std::size_t minMessageSize = 1e4;
 
-    std::size_t m_messageSize;              // message size in bytes
+private:
+    std::size_t m_messageSize;   // message size in bytes
+    std::size_t m_sndBufferSize; // circular buffer sizes (in messages)
+    std::size_t m_rcvBufferSize;
 };
 
 #endif // CONTINUOUSBENCHMARK_H

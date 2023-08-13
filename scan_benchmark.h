@@ -6,16 +6,20 @@
 class ScanBenchmark : public Benchmark
 {
 public:
-    ScanBenchmark(int argc, char **argv, int rank);
+    ScanBenchmark(std::vector<ArgumentEntry> args, int rank);
     virtual ~ScanBenchmark() override {}
 
-    void setup() override;
     void run() override;
 
 private:
+    void parseArguments(std::vector<ArgumentEntry> args) override;
     void performWarmup() override;
+    void allocateMemory() override;
 
-    const std::size_t maxPower = 22;
+    std::size_t m_maxPower = 22;
+
+    std::size_t m_sndBufferSize = 10; // circular buffer sizes (in messages)
+    std::size_t m_rcvBufferSize = 10;
 };
 
 #endif // SCANBENCHMARK_H
