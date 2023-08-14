@@ -33,23 +33,23 @@ std::vector<std::pair<int, int>> Benchmark::findSubarrayIndices(std::size_t mess
     return subarrayIndices;
 }
 
-std::pair<double, double> Benchmark::calculateThroughput(timespec startTime, timespec endTime, std::size_t messageSize, std::size_t iterations)
+std::pair<double, double> Benchmark::calculateThroughput(timespec startTime, timespec endTime, std::size_t bytesTransferred, std::size_t iterations)
 {
-    // TODO: for variable size, it should be total messages size
+    // TODO: override for ContinuousVariableMessage
     timespec elapsedTime = diff(startTime, endTime);
     double elapsedSecs = elapsedTime.tv_sec + (elapsedTime.tv_nsec / 1e9);
 
     double avgRtt = elapsedSecs / iterations;
-    double avgThroughput = (iterations * messageSize * 8.0) / (elapsedSecs * 1e6);
+    double avgThroughput = (bytesTransferred * 8.0) / (elapsedSecs * 1e6);
 
     return std::make_pair(avgRtt, avgThroughput);
 }
 
-std::size_t Benchmark::rtCommunication(std::size_t sndBufferSize, std::size_t rcvBufferSize, std::size_t messageSize, std::size_t iterations = -1)
+std::size_t Benchmark::rtCommunication(std::size_t messageSize, std::size_t iterations = -1)
 {
-    // FIXME: replace buffer size with buffer bytes
     if (iterations == -1)
         iterations = m_iterations;
+
     std::vector<MPI_Status> statuses(iterations);
     std::size_t sendOffset = 0, recvOffset = 0;
     std::size_t remainingSize, wrapSize;
@@ -58,9 +58,9 @@ std::size_t Benchmark::rtCommunication(std::size_t sndBufferSize, std::size_t rc
     {
         for (std::size_t i = 0; i < iterations; i++)
         {
-            if (sendOffset + messageSize > sndBufferSize * messageSize)
+            if (sendOffset + messageSize > m_sndBufferBytes)
             {
-                remainingSize = sndBufferSize - sendOffset;
+                remainingSize = m_sndBufferBytes - sendOffset;
                 wrapSize = messageSize - remainingSize;
 
                 MPI_Send(m_bufferSnd + sendOffset, remainingSize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
@@ -70,7 +70,7 @@ std::size_t Benchmark::rtCommunication(std::size_t sndBufferSize, std::size_t rc
             else
                 MPI_Send(m_bufferSnd + sendOffset, messageSize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
 
-            sendOffset = (sendOffset + messageSize) % sndBufferSize;
+            sendOffset = (sendOffset + messageSize) % m_sndBufferBytes;
         }
     }
     else if (m_rank == 1)
@@ -79,9 +79,9 @@ std::size_t Benchmark::rtCommunication(std::size_t sndBufferSize, std::size_t rc
         {
             MPI_Status status1, status2;
 
-            if (recvOffset + messageSize > rcvBufferSize * messageSize)
+            if (recvOffset + messageSize > m_rcvBufferBytes)
             {
-                remainingSize = rcvBufferSize - recvOffset;
+                remainingSize = m_rcvBufferBytes - recvOffset;
                 wrapSize = messageSize - remainingSize;
 
                 MPI_Recv(m_bufferRcv + recvOffset, remainingSize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &status1);
@@ -96,7 +96,7 @@ std::size_t Benchmark::rtCommunication(std::size_t sndBufferSize, std::size_t rc
             else
                 MPI_Recv(m_bufferRcv + recvOffset, messageSize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &statuses[i]);
 
-            recvOffset = (recvOffset + messageSize) % rcvBufferSize;
+            recvOffset = (recvOffset + messageSize) % m_rcvBufferBytes;
         }
     }
 
@@ -143,18 +143,18 @@ void Benchmark::performWarmup()
     std::vector<std::pair<int, int>> subarrayIndices = findSubarrayIndices(m_sndBufferBytes);
 
     clock_gettime(CLOCK_MONOTONIC, &startTime);
-    rtCommunication(m_sndBufferBytes, m_rcvBufferBytes, messageSize, m_warmupIterations);
+    rtCommunication(messageSize, m_warmupIterations);
     clock_gettime(CLOCK_MONOTONIC, &endTime);
-    std::tie(std::ignore, throughput) = calculateThroughput(startTime, endTime, messageSize, m_warmupIterations);
+    std::tie(std::ignore, throughput) = calculateThroughput(startTime, endTime, messageSize * m_warmupIterations, m_warmupIterations);
 
     std::cout << "\nPre-warmup throughput: " << throughput << " Mbit/s" << std::endl;
 
     warmupCommunication(m_bufferSnd, subarrayIndices, m_rank);
 
     clock_gettime(CLOCK_MONOTONIC, &startTime);
-    rtCommunication(m_sndBufferBytes, m_rcvBufferBytes, messageSize, m_warmupIterations);
+    rtCommunication(messageSize, m_warmupIterations);
     clock_gettime(CLOCK_MONOTONIC, &endTime);
-    std::tie(std::ignore, throughput) = calculateThroughput(startTime, endTime, messageSize, m_warmupIterations);
+    std::tie(std::ignore, throughput) = calculateThroughput(startTime, endTime, messageSize * m_warmupIterations, m_warmupIterations);
 
     std::cout << "Post-warmup throughput: " << throughput << " Mbit/s\n"
               << std::endl;

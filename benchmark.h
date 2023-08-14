@@ -34,11 +34,11 @@ public:
 protected:
     virtual void allocateMemory() = 0;
     std::vector<std::pair<int, int>> findSubarrayIndices(std::size_t messageSize);
-    std::pair<double, double> calculateThroughput(timespec startTime, timespec endTime, std::size_t messageSize, std::size_t iterations);
+    std::pair<double, double> calculateThroughput(timespec startTime, timespec endTime, std::size_t bytesTransferred, std::size_t iterations);
 
     virtual void parseArguments(std::vector<ArgumentEntry> args) = 0;
 
-    virtual std::size_t rtCommunication(std::size_t sndBufferSize, std::size_t rcvBufferSize, std::size_t messageSize, std::size_t interval);
+    virtual std::size_t rtCommunication(std::size_t messageSize, std::size_t interval);
     virtual void warmupCommunication(int8_t *bufferSnd, std::vector<std::pair<int, int>> subarrayIndices, int8_t rank);
     void performWarmup();
 
