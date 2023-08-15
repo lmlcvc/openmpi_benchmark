@@ -9,8 +9,10 @@
 #include "benchmark.h"
 #include "scan_benchmark.h"
 #include "continuous_benchmark.h"
+#include "variable_message.h"
 
 // FIXME: main hangs
+// TODO:_reorganise project structure
 
 volatile sig_atomic_t sigintReceived = 0;
 timespec run_start_time;
@@ -110,7 +112,8 @@ int main(int argc, char **argv)
     }
     else if (commType == COMM_CONTINUOUS)
     {
-        benchmark = std::make_unique<ContinuousBenchmark>(commArguments, rank);
+        // TODO: introduce fixed and variable COMM types
+        benchmark = std::make_unique<BenchmarkVariableMessage>(commArguments, rank);
     }
     else
     {

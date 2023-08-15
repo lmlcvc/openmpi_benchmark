@@ -1,17 +1,5 @@
 #include "continuous_benchmark.h"
 
-ContinuousBenchmark::ContinuousBenchmark(std::vector<ArgumentEntry> args, int rank)
-{
-    m_rank = rank;
-    parseArguments(args);
-
-    // TODO: setup buffers in inherited classes
-    // m_sndBufferBytes = m_messageSize * m_sndBufferSize;
-    allocateMemory();
-
-    // TODO: init vector of random message sizes
-}
-
 void ContinuousBenchmark::parseArguments(std::vector<ArgumentEntry> args)
 {
     std::size_t tmp;
@@ -50,7 +38,6 @@ void ContinuousBenchmark::parseArguments(std::vector<ArgumentEntry> args)
     }
 }
 
-
 void ContinuousBenchmark::allocateMemory()
 {
     const long pageSize = sysconf(_SC_PAGESIZE);
@@ -74,8 +61,4 @@ void ContinuousBenchmark::allocateMemory()
 
     MPI_Bcast(&memRcv, sizeof(void *), MPI_BYTE, 0, MPI_COMM_WORLD);
     std::unique_ptr<void, decltype(&free)> memRcvPtr(m_rank == 0 ? memRcv : nullptr, &free);
-}
-
-void ContinuousBenchmark::run()
-{
 }

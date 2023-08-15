@@ -58,7 +58,6 @@ protected:
     int8_t *m_bufferSnd;
     int8_t *m_bufferRcv;
 
-    // std::unique_ptr<void, decltype(&free)> memoryPtr;
 };
 
 #endif // BENCHMARK_H
