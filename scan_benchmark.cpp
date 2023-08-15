@@ -72,6 +72,50 @@ void ScanBenchmark::allocateMemory()
     std::unique_ptr<void, decltype(&free)> memRcvPtr(m_rank == 0 ? memRcv : nullptr, &free);
 }
 
+void ScanBenchmark::printRunInfo(std::size_t messageSize, double throughput)
+{
+    if (m_rank)
+        return;
+
+    std::cout << std::fixed << std::setprecision(2);
+    std::cout << "| " << std::left << std::setw(12) << messageSize
+              << " | " << std::setw(19) << throughput
+              << " |\n";
+}
+
 void ScanBenchmark::run()
 {
+    performWarmup();
+
+    if (m_rank == 0)
+    {
+        std::cout << std::fixed << std::setprecision(2);
+        std::cout << "| " << std::left << std::setw(12) << "Bytes"
+                  << " | " << std::setw(18) << "Throughput [Mbit/s]"
+                  << " |\n";
+        std::cout << "--------------------------------------\n";
+    }
+
+    double avgThroughput;
+    std::size_t errorMessageCount = 0;
+    timespec startTime, endTime;
+
+    std::size_t currentMessageSize;
+
+    for (std::size_t power = 0; power <= m_maxPower; power++)
+    {
+        currentMessageSize = static_cast<std::size_t>(std::pow(2, power));
+        clock_gettime(CLOCK_MONOTONIC, &startTime);
+
+        errorMessageCount += rtCommunication(currentMessageSize, m_iterations);
+
+        clock_gettime(CLOCK_MONOTONIC, &endTime);
+        std::tie(std::ignore, avgThroughput) = calculateThroughput(startTime, endTime, currentMessageSize * m_iterations, m_iterations);
+
+        printRunInfo(currentMessageSize, avgThroughput);
+    }
+
+    if (m_rank == 0)
+        std::cout << "Number of non-MPI_SUCCESS statuses: " << errorMessageCount << "\n"
+                  << std::endl;
 }

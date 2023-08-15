@@ -36,6 +36,7 @@ std::vector<std::pair<int, int>> Benchmark::findSubarrayIndices(std::size_t mess
 std::pair<double, double> Benchmark::calculateThroughput(timespec startTime, timespec endTime, std::size_t bytesTransferred, std::size_t iterations)
 {
     // TODO: override for ContinuousVariableMessage
+    // XXX: don't need iterations for scan run
     timespec elapsedTime = diff(startTime, endTime);
     double elapsedSecs = elapsedTime.tv_sec + (elapsedTime.tv_nsec / 1e9);
 
@@ -43,6 +44,24 @@ std::pair<double, double> Benchmark::calculateThroughput(timespec startTime, tim
     double avgThroughput = (bytesTransferred * 8.0) / (elapsedSecs * 1e6);
 
     return std::make_pair(avgRtt, avgThroughput);
+}
+
+void Benchmark::printRunInfo(double rtt, double throughput, int errorMessagesCount)
+{
+    if (m_rank)
+        return;
+
+    std::cout << std::fixed << std::setprecision(8);
+
+    std::cout << std::right << std::setw(14) << " Avg. RTT"
+              << " | " << std::setw(25) << "Throughput"
+              << " | " << std::setw(10) << " Errors"
+              << std::endl;
+
+    std::cout << std::right << std::setw(12) << rtt << " s"
+              << " | " << std::setw(18) << std::fixed << std::setprecision(2) << throughput << " Mbit/s"
+              << " | " << std::setw(10) << errorMessagesCount << std::endl
+              << std::endl;
 }
 
 std::size_t Benchmark::rtCommunication(std::size_t messageSize, std::size_t iterations = -1)

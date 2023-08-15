@@ -35,6 +35,7 @@ protected:
     virtual void allocateMemory() = 0;
     std::vector<std::pair<int, int>> findSubarrayIndices(std::size_t messageSize);
     std::pair<double, double> calculateThroughput(timespec startTime, timespec endTime, std::size_t bytesTransferred, std::size_t iterations);
+    void printRunInfo(double rtt, double throughput, int errorMessagesCount);
 
     virtual void parseArguments(std::vector<ArgumentEntry> args) = 0;
 
