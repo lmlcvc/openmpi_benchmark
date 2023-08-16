@@ -1,7 +1,6 @@
 #include "communication_interface.h"
 
 // TODO: handle other types of statuses
-// TODO: if it failed, don't add message size to transferred size
 std::size_t CommunicationInterface::blockingCommunication(int8_t *bufferSnd, int8_t *bufferRcv,
                                                           std::size_t sndBufferBytes, std::size_t rcvBufferBytes,
                                                           std::size_t messageSize, int rank, std::size_t iterations, std::size_t *transferredSize)
@@ -9,6 +8,7 @@ std::size_t CommunicationInterface::blockingCommunication(int8_t *bufferSnd, int
     std::vector<MPI_Status> statuses(iterations);
     std::size_t sendOffset = 0, recvOffset = 0;
     std::size_t remainingSize, wrapSize;
+    std::size_t errorMessageCount = 0;
 
     *transferredSize = messageSize * iterations;
 
@@ -26,7 +26,7 @@ std::size_t CommunicationInterface::blockingCommunication(int8_t *bufferSnd, int
                 MPI_Send(bufferSnd + sendOffset, wrapSize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
             }
             else
-                MPI_Send(bufferSnd + sendOffset, messageSize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
+                MPI_Send(bufferSnd + sendOffset, messageSize, MPI_BYTE, 1, 0, MPI_COMM_WORLD); // FIXME: failed to register user buffer
 
             sendOffset = (sendOffset + messageSize) % sndBufferBytes;
         }
@@ -58,9 +58,13 @@ std::size_t CommunicationInterface::blockingCommunication(int8_t *bufferSnd, int
         }
     }
 
-    return std::count_if(statuses.begin(), statuses.end(),
-                         [](const MPI_Status &status)
-                         { return status.MPI_ERROR != MPI_SUCCESS; });
+    errorMessageCount = std::count_if(statuses.begin(), statuses.end(),
+                                      [](const MPI_Status &status)
+                                      { return status.MPI_ERROR != MPI_SUCCESS; });
+
+    *transferredSize -= messageSize * errorMessageCount;
+
+    return errorMessageCount;
 }
 
 std::size_t CommunicationInterface::variableBlockingCommunication(int8_t *bufferSnd, int8_t *bufferRcv,
@@ -80,7 +84,6 @@ std::size_t CommunicationInterface::variableBlockingCommunication(int8_t *buffer
         for (std::size_t i = 0; i < iterations; i++)
         {
             std::size_t messageSize = messageSizes[sizeDistribution(generator)];
-            *transferredSize += messageSize;
 
             if (sendOffset + messageSize > sndBufferBytes)
             {
@@ -121,6 +124,8 @@ std::size_t CommunicationInterface::variableBlockingCommunication(int8_t *buffer
                 MPI_Recv(bufferRcv + recvOffset, messageSize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &statuses[i]);
 
             recvOffset = (recvOffset + messageSize) % rcvBufferBytes;
+            if (statuses[i].MPI_ERROR == MPI_SUCCESS)
+                *transferredSize += messageSize;
         }
     }
 
