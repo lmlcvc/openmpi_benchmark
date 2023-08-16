@@ -9,7 +9,22 @@ BenchmarkVariableMessage::BenchmarkVariableMessage(std::vector<ArgumentEntry> ar
 
     initMessageSizes();
 
-    // TODO: print info about run being performed
+    if (m_rank == 0)
+    {
+        std::cout << std::endl
+                  << "Performing variable size benchmark." << std::endl
+                  << "Available sizes: " << m_messageSizeVariants << " (range: 10000 B - " << m_sndBufferBytes << " B" << std::endl;
+
+        std::cout << std::endl
+                  << std::left << std::setw(20) << "Send buffer size:"
+                  << std::right << std::setw(10) << m_sndBufferBytes << " B" << std::endl;
+
+        std::cout << std::left << std::setw(20) << "Receive buffer size:"
+                  << std::right << std::setw(10) << m_rcvBufferBytes << " B" << std::endl;
+
+        std::cout << std::left << std::setw(20) << "Number of iterations:"
+                  << std::right << std::setw(9) << m_iterations << std::endl;
+    }
 }
 
 void BenchmarkVariableMessage::parseArguments(std::vector<ArgumentEntry> args)
@@ -58,7 +73,8 @@ void BenchmarkVariableMessage::initMessageSizes()
     int lowerBound = 1e4;
     int upperBound = m_sndBufferBytes;
 
-    int expectedValue = 1 << 18;
+    int expectedValue = 1 << 18; // FIXME: not if sndBufferBytes is something else, do it with shifts
+    // also print that
     int shiftFactor = expectedValue - (upperBound + lowerBound) / 2;
 
     std::uniform_int_distribution<int> distribution(lowerBound + shiftFactor, upperBound + shiftFactor);
