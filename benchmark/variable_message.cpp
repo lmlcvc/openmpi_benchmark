@@ -6,13 +6,44 @@ BenchmarkVariableMessage::BenchmarkVariableMessage(std::vector<ArgumentEntry> ar
     parseArguments(args);
 
     initMessageSizes();
+}
 
-    /*m_sndBufferBytes = m_sndBufferSize * static_cast<std::size_t>(std::pow(2, m_maxPower)); // XXX: check buffer size implementation
-    m_rcvBufferBytes = m_rcvBufferSize * static_cast<std::size_t>(std::pow(2, m_maxPower));
-
-    allocateMemory();*/
-
-    // TODO: setup buffers
+void BenchmarkVariableMessage::parseArguments(std::vector<ArgumentEntry> args)
+{
+    std::size_t tmp;
+    for (const auto &entry : args)
+    {
+        switch (entry.option)
+        {
+        case 'b':
+            tmp = std::stoul(entry.value);
+            m_sndBufferBytes = (tmp > 0) ? tmp : m_sndBufferBytes;
+            break;
+        case 'r':
+            tmp = std::stoul(entry.value);
+            m_rcvBufferBytes = (tmp > 0) ? tmp : m_rcvBufferBytes;
+            break;
+        case 'm':
+            tmp = std::stoul(entry.value);
+            m_messageSizeVariants = (tmp > 0) ? tmp : m_messageSizeVariants;
+            break;
+        case 'i':
+            tmp = std::stoul(entry.value);
+            m_iterations = (tmp > m_minIterations) ? tmp : m_iterations;
+            break;
+        case 'w':
+            tmp = std::stoul(entry.value);
+            m_warmupIterations = (tmp > 0) ? tmp : m_warmupIterations;
+            break;
+        default:
+            if (m_rank == 0)
+            {
+                std::cerr << "Invalid argument: " << entry.option << std::endl;
+                MPI_Finalize();
+                std::exit(1);
+            }
+        }
+    }
 }
 
 void BenchmarkVariableMessage::initMessageSizes()
@@ -21,7 +52,7 @@ void BenchmarkVariableMessage::initMessageSizes()
     std::mt19937 generator(seed);
 
     int lowerBound = 1e4;
-    int upperBound = 1e7;
+    int upperBound = m_sndBufferBytes;
 
     int expectedValue = 1 << 18;
     int shiftFactor = expectedValue - (upperBound + lowerBound) / 2;

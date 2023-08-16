@@ -6,13 +6,11 @@
 #include <memory>
 #include <mpi.h>
 
-#include "benchmark.h"
-#include "scan_benchmark.h"
-#include "continuous_benchmark.h"
-#include "variable_message.h"
-
-// FIXME: main hangs
-// TODO:_reorganise project structure
+#include "benchmark/benchmark.h"
+#include "benchmark/scan_benchmark.h"
+#include "benchmark/continuous_benchmark.h"
+#include "benchmark/variable_message.h"
+#include "benchmark/fixed_message.h"
 
 volatile sig_atomic_t sigintReceived = 0;
 timespec run_start_time;
@@ -69,6 +67,7 @@ void parseArguments(int argc, char **argv, int rank, CommunicationType &commType
             break;
         case 'h':
         default:
+            // TODO: help for each type of communication
             if (rank == 0)
                 std::cout << "Usage: " << argv[0] << std::endl
                           << "\t-m <message-size>\n\t-i <print-interval>\n\t"

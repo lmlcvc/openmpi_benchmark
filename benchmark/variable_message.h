@@ -15,8 +15,9 @@ public:
 
 private:
     void initMessageSizes();
+    void parseArguments(std::vector<ArgumentEntry> args) override;
 
-    std::size_t m_maxMessageSize = 1e7;
+    std::size_t m_messageSizeVariants = 100;
     std::vector<std::size_t> m_messageSizes;
 };
 
