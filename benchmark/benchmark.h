@@ -49,10 +49,10 @@ public:
     virtual void run() = 0;
 
 protected:
-    virtual void allocateMemory() = 0;
+    void allocateMemory();
     std::vector<std::pair<int, int>> findSubarrayIndices(std::size_t messageSize);
     std::pair<double, double> calculateThroughput(timespec startTime, timespec endTime, std::size_t bytesTransferred, std::size_t iterations);
-    void printRunInfo(double rtt, double throughput, int errorMessagesCount);       // TODO: remove from here and reuse
+    void printRunInfo(double rtt, double throughput, int errorMessagesCount); // TODO: remove from here and reuse
 
     virtual void parseArguments(std::vector<ArgumentEntry> args) = 0;
 
@@ -69,12 +69,11 @@ protected:
     void *memSnd = nullptr;
     void *memRcv = nullptr;
 
-    std::size_t m_sndBufferBytes;
-    std::size_t m_rcvBufferBytes;
+    std::size_t m_sndBufferBytes = 1e7;
+    std::size_t m_rcvBufferBytes = 1e7;
 
     int8_t *m_bufferSnd;
     int8_t *m_bufferRcv;
-
 };
 
 #endif // BENCHMARK_H

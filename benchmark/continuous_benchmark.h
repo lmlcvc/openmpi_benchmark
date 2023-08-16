@@ -9,7 +9,6 @@ public:
     void run() override;
 
 protected:
-    void allocateMemory() override;
     virtual void printIterationInfo(timespec startTime, timespec endTime, std::size_t transferredSize) = 0;
 
     CommunicationType m_commType = COMM_UNDEFINED;

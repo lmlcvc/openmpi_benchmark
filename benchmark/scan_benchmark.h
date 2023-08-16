@@ -13,7 +13,6 @@ public:
 
 private:
     void parseArguments(std::vector<ArgumentEntry> args) override;
-    void allocateMemory() override;
     void printRunInfo(std::size_t messageSize, double throughput);
 
     std::size_t m_maxPower = 22;
