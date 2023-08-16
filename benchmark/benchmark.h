@@ -46,8 +46,7 @@ protected:
 
     virtual void parseArguments(std::vector<ArgumentEntry> args) = 0;
 
-    virtual std::size_t rtCommunication(std::size_t messageSize, std::size_t interval);
-    virtual void warmupCommunication(int8_t *bufferSnd, std::vector<std::pair<int, int>> subarrayIndices, int8_t rank);
+    virtual void warmupCommunication(std::vector<std::pair<int, int>> subarrayIndices, int8_t rank);
     void performWarmup();
 
     int m_rank;

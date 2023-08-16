@@ -64,67 +64,7 @@ void Benchmark::printRunInfo(double rtt, double throughput, int errorMessagesCou
               << std::endl;
 }
 
-std::size_t Benchmark::rtCommunication(std::size_t messageSize, std::size_t iterations = -1)
-{
-    if (iterations == -1)
-        iterations = m_iterations;
-
-    std::vector<MPI_Status> statuses(iterations);
-    std::size_t sendOffset = 0, recvOffset = 0;
-    std::size_t remainingSize, wrapSize;
-
-    if (m_rank == 0)
-    {
-        for (std::size_t i = 0; i < iterations; i++)
-        {
-            if (sendOffset + messageSize > m_sndBufferBytes)
-            {
-                remainingSize = m_sndBufferBytes - sendOffset;
-                wrapSize = messageSize - remainingSize;
-
-                MPI_Send(m_bufferSnd + sendOffset, remainingSize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
-                sendOffset = 0;
-                MPI_Send(m_bufferSnd + sendOffset, wrapSize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
-            }
-            else
-                MPI_Send(m_bufferSnd + sendOffset, messageSize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
-
-            sendOffset = (sendOffset + messageSize) % m_sndBufferBytes;
-        }
-    }
-    else if (m_rank == 1)
-    {
-        for (std::size_t i = 0; i < iterations; i++)
-        {
-            MPI_Status status1, status2;
-
-            if (recvOffset + messageSize > m_rcvBufferBytes)
-            {
-                remainingSize = m_rcvBufferBytes - recvOffset;
-                wrapSize = messageSize - remainingSize;
-
-                MPI_Recv(m_bufferRcv + recvOffset, remainingSize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &status1);
-                recvOffset = 0;
-                MPI_Recv(m_bufferRcv + recvOffset, wrapSize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &status2);
-
-                if (status1.MPI_ERROR != MPI_SUCCESS)
-                    statuses[i].MPI_ERROR = status1.MPI_ERROR;
-                else if (status2.MPI_ERROR != MPI_SUCCESS)
-                    statuses[i].MPI_ERROR = status2.MPI_ERROR;
-            }
-            else
-                MPI_Recv(m_bufferRcv + recvOffset, messageSize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &statuses[i]);
-
-            recvOffset = (recvOffset + messageSize) % m_rcvBufferBytes;
-        }
-    }
-
-    return std::count_if(statuses.begin(), statuses.end(),
-                         [](const MPI_Status &status)
-                         { return status.MPI_ERROR != MPI_SUCCESS; });
-}
-
-void Benchmark::warmupCommunication(int8_t *bufferSnd, std::vector<std::pair<int, int>> subarrayIndices, int8_t rank)
+void Benchmark::warmupCommunication(std::vector<std::pair<int, int>> subarrayIndices, int8_t rank)
 {
     std::size_t subarrayCount = subarrayIndices.size();
     std::size_t subarraySize;
@@ -137,7 +77,7 @@ void Benchmark::warmupCommunication(int8_t *bufferSnd, std::vector<std::pair<int
         for (int i = 0; i < subarrayCount; i++)
         {
             subarraySize = subarrayIndices[i].second - subarrayIndices[i].first + 1;
-            MPI_Send(bufferSnd + subarrayIndices[i].first, subarraySize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
+            MPI_Send(m_bufferSnd + subarrayIndices[i].first, subarraySize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
         }
     }
     else if (rank == 1)
@@ -145,7 +85,7 @@ void Benchmark::warmupCommunication(int8_t *bufferSnd, std::vector<std::pair<int
         for (int i = 0; i < subarrayCount; i++)
         {
             subarraySize = subarrayIndices[i].second - subarrayIndices[i].first + 1;
-            MPI_Recv(bufferSnd + subarrayIndices[i].first, subarraySize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            MPI_Recv(m_bufferRcv + subarrayIndices[i].first, subarraySize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         }
     }
 
@@ -162,16 +102,17 @@ void Benchmark::performWarmup()
     std::vector<std::pair<int, int>> subarrayIndices = findSubarrayIndices(m_sndBufferBytes);
 
     clock_gettime(CLOCK_MONOTONIC, &startTime);
-    rtCommunication(messageSize, m_warmupIterations);
+    // TODO: monitor errors in warmup
+    CommunicationInterface::blockingCommunication(m_bufferSnd, m_bufferRcv, m_sndBufferBytes, m_rcvBufferBytes, messageSize, m_rank, m_warmupIterations);
     clock_gettime(CLOCK_MONOTONIC, &endTime);
     std::tie(std::ignore, throughput) = calculateThroughput(startTime, endTime, messageSize * m_warmupIterations, m_warmupIterations);
 
     std::cout << "\nPre-warmup throughput: " << throughput << " Mbit/s" << std::endl;
 
-    warmupCommunication(m_bufferSnd, subarrayIndices, m_rank);
+    warmupCommunication(subarrayIndices, m_rank);
 
     clock_gettime(CLOCK_MONOTONIC, &startTime);
-    rtCommunication(messageSize, m_warmupIterations);
+    CommunicationInterface::blockingCommunication(m_bufferSnd, m_bufferRcv, m_sndBufferBytes, m_rcvBufferBytes, messageSize, m_rank, m_warmupIterations);
     clock_gettime(CLOCK_MONOTONIC, &endTime);
     std::tie(std::ignore, throughput) = calculateThroughput(startTime, endTime, messageSize * m_warmupIterations, m_warmupIterations);
 

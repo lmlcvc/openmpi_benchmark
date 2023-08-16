@@ -5,7 +5,7 @@ ScanBenchmark::ScanBenchmark(std::vector<ArgumentEntry> args, int rank)
     m_rank = rank;
     parseArguments(args);
 
-    m_sndBufferBytes = m_sndBufferSize * static_cast<std::size_t>(std::pow(2, m_maxPower)); // XXX: check buffer size implementation
+    m_sndBufferBytes = m_sndBufferSize * static_cast<std::size_t>(std::pow(2, m_maxPower));
     m_rcvBufferBytes = m_rcvBufferSize * static_cast<std::size_t>(std::pow(2, m_maxPower));
 
     allocateMemory();
@@ -107,7 +107,8 @@ void ScanBenchmark::run()
         currentMessageSize = static_cast<std::size_t>(std::pow(2, power));
         clock_gettime(CLOCK_MONOTONIC, &startTime);
 
-        errorMessageCount += rtCommunication(currentMessageSize, m_iterations);
+        errorMessageCount += CommunicationInterface::blockingCommunication(m_bufferSnd, m_bufferRcv, m_sndBufferBytes, m_rcvBufferBytes,
+                                                                           currentMessageSize, m_rank, m_iterations);
 
         clock_gettime(CLOCK_MONOTONIC, &endTime);
         std::tie(std::ignore, avgThroughput) = calculateThroughput(startTime, endTime, currentMessageSize * m_iterations, m_iterations);

@@ -1,6 +1,7 @@
 #include "communication_interface.h"
 
-std::size_t CommunicationInterface::blockingCommunication(std::vector<int8_t> &bufferSnd, std::vector<int8_t> &bufferRcv,
+// TODO: handle other types of statuses
+std::size_t CommunicationInterface::blockingCommunication(int8_t *bufferSnd, int8_t *bufferRcv,
                                                           std::size_t sndBufferBytes, std::size_t rcvBufferBytes,
                                                           std::size_t messageSize, int rank, std::size_t iterations)
 {
@@ -17,12 +18,12 @@ std::size_t CommunicationInterface::blockingCommunication(std::vector<int8_t> &b
                 remainingSize = sndBufferBytes - sendOffset;
                 wrapSize = messageSize - remainingSize;
 
-                MPI_Send(&bufferSnd[sendOffset], remainingSize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
+                MPI_Send(bufferSnd + sendOffset, remainingSize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
                 sendOffset = 0;
-                MPI_Send(&bufferSnd[sendOffset], wrapSize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
+                MPI_Send(bufferSnd + sendOffset, wrapSize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
             }
             else
-                MPI_Send(&bufferSnd[sendOffset], messageSize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
+                MPI_Send(bufferSnd + sendOffset, messageSize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
 
             sendOffset = (sendOffset + messageSize) % sndBufferBytes;
         }
@@ -38,9 +39,9 @@ std::size_t CommunicationInterface::blockingCommunication(std::vector<int8_t> &b
                 remainingSize = rcvBufferBytes - recvOffset;
                 wrapSize = messageSize - remainingSize;
 
-                MPI_Recv(&bufferRcv[sendOffset], remainingSize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &status1);
+                MPI_Recv(bufferRcv + recvOffset, remainingSize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &status1);
                 recvOffset = 0;
-                MPI_Recv(&bufferRcv[sendOffset], wrapSize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &status2);
+                MPI_Recv(bufferRcv + recvOffset, wrapSize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &status2);
 
                 if (status1.MPI_ERROR != MPI_SUCCESS)
                     statuses[i].MPI_ERROR = status1.MPI_ERROR;
@@ -48,7 +49,7 @@ std::size_t CommunicationInterface::blockingCommunication(std::vector<int8_t> &b
                     statuses[i].MPI_ERROR = status2.MPI_ERROR;
             }
             else
-                MPI_Recv(&bufferRcv[sendOffset], messageSize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &statuses[i]);
+                MPI_Recv(bufferRcv + recvOffset, messageSize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &statuses[i]);
 
             recvOffset = (recvOffset + messageSize) % rcvBufferBytes;
         }
@@ -59,7 +60,7 @@ std::size_t CommunicationInterface::blockingCommunication(std::vector<int8_t> &b
                          { return status.MPI_ERROR != MPI_SUCCESS; });
 }
 
-std::size_t CommunicationInterface::variableBlockingCommunication(std::vector<int8_t> &bufferSnd, std::vector<int8_t> &bufferRcv,
+std::size_t CommunicationInterface::variableBlockingCommunication(int8_t *bufferSnd, int8_t *bufferRcv,
                                                                   std::size_t sndBufferBytes, std::size_t rcvBufferBytes,
                                                                   std::vector<std::size_t> messageSizes, int rank, std::size_t iterations)
 {
@@ -82,12 +83,12 @@ std::size_t CommunicationInterface::variableBlockingCommunication(std::vector<in
                 remainingSize = sndBufferBytes - sendOffset;
                 wrapSize = messageSize - remainingSize;
 
-                MPI_Send(&bufferSnd[sendOffset], remainingSize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
+                MPI_Send(bufferSnd + sendOffset, remainingSize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
                 sendOffset = 0;
-                MPI_Send(&bufferSnd[sendOffset], wrapSize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
+                MPI_Send(bufferSnd + sendOffset, wrapSize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
             }
             else
-                MPI_Send(&bufferSnd[sendOffset], messageSize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
+                MPI_Send(bufferSnd + sendOffset, messageSize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
 
             sendOffset = (sendOffset + messageSize) % sndBufferBytes;
         }
@@ -103,9 +104,9 @@ std::size_t CommunicationInterface::variableBlockingCommunication(std::vector<in
                 remainingSize = rcvBufferBytes - recvOffset;
                 wrapSize = messageSize - remainingSize;
 
-                MPI_Recv(&bufferRcv[sendOffset], remainingSize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &status1);
+                MPI_Recv(bufferRcv + recvOffset, remainingSize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &status1);
                 recvOffset = 0;
-                MPI_Recv(&bufferRcv[sendOffset], wrapSize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &status2);
+                MPI_Recv(bufferRcv + recvOffset, wrapSize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &status2);
 
                 if (status1.MPI_ERROR != MPI_SUCCESS)
                     statuses[i].MPI_ERROR = status1.MPI_ERROR;
@@ -113,7 +114,7 @@ std::size_t CommunicationInterface::variableBlockingCommunication(std::vector<in
                     statuses[i].MPI_ERROR = status2.MPI_ERROR;
             }
             else
-                MPI_Recv(&bufferRcv[sendOffset], messageSize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &statuses[i]);
+                MPI_Recv(bufferRcv + recvOffset, messageSize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &statuses[i]);
 
             recvOffset = (recvOffset + messageSize) % rcvBufferBytes;
         }
