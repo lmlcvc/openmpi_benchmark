@@ -13,14 +13,6 @@
 #include "benchmark/fixed_message.h"
 
 volatile sig_atomic_t sigintReceived = 0;
-timespec run_start_time;
-
-enum CommunicationType
-{
-    COMM_UNDEFINED,
-    COMM_SCAN = 's',
-    COMM_CONTINUOUS = 'c'
-};
 
 void handleSignals(int signal)
 {
@@ -50,7 +42,7 @@ void parseArguments(int argc, char **argv, int rank, CommunicationType &commType
         case 'c':
             if (commType == COMM_UNDEFINED)
             {
-                commType = COMM_CONTINUOUS;
+                commType = COMM_FIXED_BLOCKING; // TODO: flags for nonblocking
             }
             else if (rank == 0)
             {
@@ -109,10 +101,10 @@ int main(int argc, char **argv)
     {
         benchmark = std::make_unique<ScanBenchmark>(commArguments, rank);
     }
-    else if (commType == COMM_CONTINUOUS)
+    else if (commType == COMM_FIXED_BLOCKING || commType == COMM_FIXED_NONBLOCKING)
     {
         // TODO: introduce fixed and variable COMM types
-        benchmark = std::make_unique<BenchmarkVariableMessage>(commArguments, rank);
+        benchmark = std::make_unique<BenchmarkFixedMessage>(commArguments, rank, commType);
     }
     else
     {

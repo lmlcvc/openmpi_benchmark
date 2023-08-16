@@ -98,23 +98,27 @@ void Benchmark::performWarmup()
     timespec startTime, endTime;
     double throughput;
     std::size_t messageSize = m_sndBufferBytes / 10;
+    std::size_t transferredSize = 0;
 
     std::vector<std::pair<int, int>> subarrayIndices = findSubarrayIndices(m_sndBufferBytes);
 
     clock_gettime(CLOCK_MONOTONIC, &startTime);
     // TODO: monitor errors in warmup
-    CommunicationInterface::blockingCommunication(m_bufferSnd, m_bufferRcv, m_sndBufferBytes, m_rcvBufferBytes, messageSize, m_rank, m_warmupIterations);
+    CommunicationInterface::blockingCommunication(m_bufferSnd, m_bufferRcv, m_sndBufferBytes, m_rcvBufferBytes,
+                                                  messageSize, m_rank, m_warmupIterations, &transferredSize);
     clock_gettime(CLOCK_MONOTONIC, &endTime);
-    std::tie(std::ignore, throughput) = calculateThroughput(startTime, endTime, messageSize * m_warmupIterations, m_warmupIterations);
+    std::tie(std::ignore, throughput) = calculateThroughput(startTime, endTime, transferredSize, m_warmupIterations);
 
     std::cout << "\nPre-warmup throughput: " << throughput << " Mbit/s" << std::endl;
 
     warmupCommunication(subarrayIndices, m_rank);
 
+    transferredSize = 0;
     clock_gettime(CLOCK_MONOTONIC, &startTime);
-    CommunicationInterface::blockingCommunication(m_bufferSnd, m_bufferRcv, m_sndBufferBytes, m_rcvBufferBytes, messageSize, m_rank, m_warmupIterations);
+    CommunicationInterface::blockingCommunication(m_bufferSnd, m_bufferRcv, m_sndBufferBytes, m_rcvBufferBytes,
+                                                  messageSize, m_rank, m_warmupIterations, &transferredSize);
     clock_gettime(CLOCK_MONOTONIC, &endTime);
-    std::tie(std::ignore, throughput) = calculateThroughput(startTime, endTime, messageSize * m_warmupIterations, m_warmupIterations);
+    std::tie(std::ignore, throughput) = calculateThroughput(startTime, endTime, transferredSize, m_warmupIterations);
 
     std::cout << "Post-warmup throughput: " << throughput << " Mbit/s\n"
               << std::endl;

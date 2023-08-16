@@ -1,8 +1,11 @@
 #include "fixed_message.h"
 
-BenchmarkFixedMessage::BenchmarkFixedMessage(std::vector<ArgumentEntry> args, int rank)
+BenchmarkFixedMessage::BenchmarkFixedMessage(std::vector<ArgumentEntry> args, int rank, CommunicationType commType)
 {
     m_rank = rank;
+    m_commType = commType;
+    m_messageSize = 1e4;
+
     parseArguments(args);
 
     allocateMemory();
@@ -13,6 +16,8 @@ BenchmarkFixedMessage::BenchmarkFixedMessage(std::vector<ArgumentEntry> args, in
         MPI_Finalize();
         std::exit(1);
     }
+
+    // TODO: print info about run being performed
 }
 
 void BenchmarkFixedMessage::parseArguments(std::vector<ArgumentEntry> args)
@@ -51,6 +56,10 @@ void BenchmarkFixedMessage::parseArguments(std::vector<ArgumentEntry> args)
             }
         }
     }
+}
+
+void BenchmarkFixedMessage::printIterationInfo(timespec startTime, timespec endTime, std::size_t transferredSize)
+{
 }
 
 void BenchmarkFixedMessage::run()

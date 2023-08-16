@@ -101,19 +101,21 @@ void ScanBenchmark::run()
     timespec startTime, endTime;
 
     std::size_t currentMessageSize;
+    std::size_t transferredSize;
 
     for (std::size_t power = 0; power <= m_maxPower; power++)
     {
         currentMessageSize = static_cast<std::size_t>(std::pow(2, power));
+        transferredSize = 0;
         clock_gettime(CLOCK_MONOTONIC, &startTime);
 
         errorMessageCount += CommunicationInterface::blockingCommunication(m_bufferSnd, m_bufferRcv, m_sndBufferBytes, m_rcvBufferBytes,
-                                                                           currentMessageSize, m_rank, m_iterations);
+                                                                           currentMessageSize, m_rank, m_iterations, &transferredSize);
 
         clock_gettime(CLOCK_MONOTONIC, &endTime);
-        std::tie(std::ignore, avgThroughput) = calculateThroughput(startTime, endTime, currentMessageSize * m_iterations, m_iterations);
+        std::tie(std::ignore, avgThroughput) = calculateThroughput(startTime, endTime, transferredSize, m_iterations);
 
-        printRunInfo(currentMessageSize, avgThroughput);
+        printRunInfo(currentMessageSize, avgThroughput);        // TODO: own print function
     }
 
     if (m_rank == 0)

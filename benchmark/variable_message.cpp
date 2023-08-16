@@ -1,11 +1,15 @@
 #include "variable_message.h"
 
-BenchmarkVariableMessage::BenchmarkVariableMessage(std::vector<ArgumentEntry> args, int rank)
+BenchmarkVariableMessage::BenchmarkVariableMessage(std::vector<ArgumentEntry> args, int rank, CommunicationType commType)
 {
     m_rank = rank;
+    m_commType = commType;
+
     parseArguments(args);
 
     initMessageSizes();
+
+    // TODO: print info about run being performed
 }
 
 void BenchmarkVariableMessage::parseArguments(std::vector<ArgumentEntry> args)
@@ -62,6 +66,10 @@ void BenchmarkVariableMessage::initMessageSizes()
     m_messageSizes.clear();
     for (size_t i = 0; i < 100; i++)
         m_messageSizes.push_back(distribution(generator));
+}
+
+void BenchmarkVariableMessage::printIterationInfo(timespec startTime, timespec endTime, std::size_t transferredSize)
+{
 }
 
 void BenchmarkVariableMessage::run()

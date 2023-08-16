@@ -27,6 +27,16 @@ struct ArgumentEntry
     std::string value;
 };
 
+enum CommunicationType
+{
+    COMM_UNDEFINED,
+    COMM_SCAN,
+    COMM_FIXED_BLOCKING,
+    COMM_FIXED_NONBLOCKING,
+    COMM_VARIABLE_BLOCKING,
+    COMM_VARIABLE_NONBLOCKING
+};
+
 // TODO: handle recieve buffer and message size relation
 // (cannot make the recieved stuff exceed buffer)
 // either handle sizes or recieve in loop
@@ -42,7 +52,7 @@ protected:
     virtual void allocateMemory() = 0;
     std::vector<std::pair<int, int>> findSubarrayIndices(std::size_t messageSize);
     std::pair<double, double> calculateThroughput(timespec startTime, timespec endTime, std::size_t bytesTransferred, std::size_t iterations);
-    void printRunInfo(double rtt, double throughput, int errorMessagesCount);
+    void printRunInfo(double rtt, double throughput, int errorMessagesCount);       // TODO: remove from here and reuse
 
     virtual void parseArguments(std::vector<ArgumentEntry> args) = 0;
 

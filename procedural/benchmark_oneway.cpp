@@ -237,6 +237,9 @@ void setup_continuous_communication(std::vector<int8_t> &snd_buffer, std::vector
 
     while (running)
     {
+        // Reset counters
+        clock_gettime(CLOCK_MONOTONIC, &start_time);
+
         error_messages_count = perform_rt_communication(snd_buffer, rcv_buffer, buffer_size, message, message_size, rank, print_interval);
 
         clock_gettime(CLOCK_MONOTONIC, &end_time);
@@ -244,9 +247,6 @@ void setup_continuous_communication(std::vector<int8_t> &snd_buffer, std::vector
 
         if (rank == 0)
             print_continuous(avg_rtt, avg_throughput, error_messages_count);
-
-        // Reset counters
-        clock_gettime(CLOCK_MONOTONIC, &start_time);
 
         if (sigintReceived)
         {

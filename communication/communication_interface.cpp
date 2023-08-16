@@ -1,13 +1,16 @@
 #include "communication_interface.h"
 
 // TODO: handle other types of statuses
+// TODO: if it failed, don't add message size to transferred size
 std::size_t CommunicationInterface::blockingCommunication(int8_t *bufferSnd, int8_t *bufferRcv,
                                                           std::size_t sndBufferBytes, std::size_t rcvBufferBytes,
-                                                          std::size_t messageSize, int rank, std::size_t iterations)
+                                                          std::size_t messageSize, int rank, std::size_t iterations, std::size_t *transferredSize)
 {
     std::vector<MPI_Status> statuses(iterations);
     std::size_t sendOffset = 0, recvOffset = 0;
     std::size_t remainingSize, wrapSize;
+
+    *transferredSize = messageSize * iterations;
 
     if (rank == 0)
     {
@@ -62,7 +65,7 @@ std::size_t CommunicationInterface::blockingCommunication(int8_t *bufferSnd, int
 
 std::size_t CommunicationInterface::variableBlockingCommunication(int8_t *bufferSnd, int8_t *bufferRcv,
                                                                   std::size_t sndBufferBytes, std::size_t rcvBufferBytes,
-                                                                  std::vector<std::size_t> messageSizes, int rank, std::size_t iterations)
+                                                                  std::vector<std::size_t> messageSizes, int rank, std::size_t iterations, std::size_t *transferredSize)
 {
     std::vector<MPI_Status> statuses(iterations);
     std::size_t sendOffset = 0, recvOffset = 0;
@@ -77,6 +80,7 @@ std::size_t CommunicationInterface::variableBlockingCommunication(int8_t *buffer
         for (std::size_t i = 0; i < iterations; i++)
         {
             std::size_t messageSize = messageSizes[sizeDistribution(generator)];
+            *transferredSize += messageSize;
 
             if (sendOffset + messageSize > sndBufferBytes)
             {

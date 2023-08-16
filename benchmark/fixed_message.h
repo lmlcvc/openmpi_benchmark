@@ -6,15 +6,14 @@
 class BenchmarkFixedMessage : public ContinuousBenchmark
 {
 public:
-    BenchmarkFixedMessage(std::vector<ArgumentEntry> args, int rank);
+    BenchmarkFixedMessage(std::vector<ArgumentEntry> args, int rank, CommunicationType commType);
     virtual ~BenchmarkFixedMessage() override {}
 
     void run() override;
 
 private:
     void parseArguments(std::vector<ArgumentEntry> args) override;
-
-    std::size_t m_messageSize = 1e4; // message size in bytes
+    void printIterationInfo(timespec startTime, timespec endTime, std::size_t transferredSize) override;
 };
 
 #endif // BENCHMARKFIXEDMESSAGE_H
