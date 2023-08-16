@@ -61,13 +61,14 @@ protected:
 
     int m_rank;
 
-    std::size_t m_iterations;       // communication steps to be printed
-    std::size_t m_warmupIterations; // iteration count for warmup-related throughput calculation
+    std::size_t m_iterations = 1e5;       // communication steps to be printed
+    std::size_t m_warmupIterations = 100; // iteration count for warmup-related throughput calculation
 
     const std::size_t m_minIterations = 1e5;
 
-    void *memSnd;
-    void *memRcv;
+    void *memSnd = nullptr;
+    void *memRcv = nullptr;
+
     std::size_t m_sndBufferBytes;
     std::size_t m_rcvBufferBytes;
 
