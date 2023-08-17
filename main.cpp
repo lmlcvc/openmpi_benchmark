@@ -20,10 +20,44 @@ void handleSignals(int signal)
         sigintReceived = 1;
 }
 
+void printHelp()
+{
+    std::cout << "Modes of Operation:\n";
+    std::cout << "  -s            Perform a scan run.\n";
+    std::cout << "  -f            Perform a fixed message size run.\n";
+    std::cout << "  -v            Perform a variable message size run.\n";
+    std::cout << "  -n            Use non-blocking mode.\n\n";
+
+    std::cout << "  SCAN RUN:\n";
+    std::cout << "    -s                      Perform a scan run with varied message sizes.\n";
+    std::cout << "    -p <max power>           Set the maximum power of 2 for message sizes.\n";
+    std::cout << "    -i <iterations>          Specify the number of iterations.\n";
+    std::cout << "    -b <send buffer size>   Set the size of the send buffer in messages.\n";
+    std::cout << "    -r <receive buffer size> Set the size of the receive buffer in messages.\n";
+    std::cout << "    -w <warmup iterations>   Set the number of warmup iterations.\n\n";
+
+    std::cout << "  FIXED MESSAGE SIZE RUN:\n";
+    std::cout << "    -f                      Perform a run with a fixed message size.\n";
+    std::cout << "    -m <message size>        Set the fixed message size.\n";
+    std::cout << "    -i <iterations>          Specify the number of iterations.\n";
+    std::cout << "    -b <send buffer bytes>   Set the size of the send buffer in bytes.\n";
+    std::cout << "    -r <receive buffer bytes> Set the size of the receive buffer in bytes.\n";
+    std::cout << "    -w <warmup iterations>   Set the number of warmup iterations.\n\n";
+
+    std::cout << "  VARIABLE MESSAGE SIZE RUN:\n";
+    std::cout << "    -v                      Perform a run with variable message sizes.\n";
+    std::cout << "    -m <message size variants> Set the number of message size variants.\n";
+    std::cout << "    -i <iterations>          Specify the number of iterations.\n";
+    std::cout << "    -b <send buffer bytes>   Set the size of the send buffer in bytes.\n";
+    std::cout << "    -r <receive buffer bytes> Set the size of the receive buffer in bytes.\n";
+    std::cout << "    -w <warmup iterations>   Set the number of warmup iterations.\n";
+}
+
 void parseArguments(int argc, char **argv, int rank, CommunicationType &commType, std::vector<ArgumentEntry> &commArguments)
 {
     int opt;
-    while ((opt = getopt(argc, argv, "m:i:b:w:sch")) != -1)
+    bool nonblocking = false;
+    while ((opt = getopt(argc, argv, "m:i:b:w:sfvnh")) != -1)
     {
         switch (opt)
         {
@@ -39,10 +73,10 @@ void parseArguments(int argc, char **argv, int rank, CommunicationType &commType
                 std::exit(1);
             }
             break;
-        case 'c':
+        case 'f':
             if (commType == COMM_UNDEFINED)
             {
-                commType = COMM_FIXED_BLOCKING; // TODO: flags for nonblocking
+                commType = nonblocking ? COMM_FIXED_NONBLOCKING : COMM_FIXED_BLOCKING;
             }
             else if (rank == 0)
             {
@@ -51,20 +85,36 @@ void parseArguments(int argc, char **argv, int rank, CommunicationType &commType
                 std::exit(1);
             }
             break;
+        case 'v':
+            if (commType == COMM_UNDEFINED)
+            {
+                commType = nonblocking ? COMM_VARIABLE_NONBLOCKING : COMM_VARIABLE_BLOCKING;
+            }
+            else if (rank == 0)
+            {
+                std::cerr << "Cannot have multiple communication types" << std::endl;
+                MPI_Finalize();
+                std::exit(1);
+            }
+            break;
+        case 'n':
+            if (commType == COMM_VARIABLE_BLOCKING)
+                commType = COMM_VARIABLE_NONBLOCKING;
+            if (commType == COMM_FIXED_BLOCKING)
+                commType = COMM_FIXED_NONBLOCKING;
+            nonblocking = true;
         case 'm':
         case 'i':
         case 'b':
+        case 'r':
         case 'w':
+        case 'p':
             commArguments.push_back({static_cast<char>(opt), optarg});
             break;
         case 'h':
         default:
-            // TODO: help for each type of communication
             if (rank == 0)
-                std::cout << "Usage: " << argv[0] << std::endl
-                          << "\t-m <message-size>\n\t-i <print-interval>\n\t"
-                          << "-b <buffer-size> [messages]\n\t-w <iterations in warmup throughput>\n\t"
-                          << "-c continuous run\n\t-s perform scan\n\t-h help" << std::endl;
+                printHelp();
             MPI_Finalize();
             std::exit(1);
         }
@@ -101,10 +151,13 @@ int main(int argc, char **argv)
     {
         benchmark = std::make_unique<ScanBenchmark>(commArguments, rank);
     }
-    else if (commType == COMM_FIXED_BLOCKING || commType == COMM_FIXED_NONBLOCKING)
+    else if (commType == COMM_FIXED_BLOCKING)
     {
-        // TODO: introduce fixed and variable COMM types
         benchmark = std::make_unique<BenchmarkFixedMessage>(commArguments, rank, commType);
+    }
+    else if (commType == COMM_VARIABLE_BLOCKING)
+    {
+        benchmark = std::make_unique<BenchmarkVariableMessage>(commArguments, rank, commType);
     }
     else
     {
