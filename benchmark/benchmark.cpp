@@ -1,6 +1,6 @@
 #include "benchmark.h"
 
-timespec diff(timespec start, timespec end)
+timespec Benchmark::diff(timespec start, timespec end)
 {
     timespec time_diff;
     if ((end.tv_nsec - start.tv_nsec) < 0)
@@ -67,24 +67,6 @@ void Benchmark::allocateMemory()
 
     MPI_Bcast(&memRcv, sizeof(void *), MPI_BYTE, 0, MPI_COMM_WORLD);
     std::unique_ptr<void, decltype(&free)> memRcvPtr(m_rank == 0 ? memRcv : nullptr, &free);
-}
-
-void Benchmark::printRunInfo(double rtt, double throughput, int errorMessagesCount)
-{
-    if (m_rank)
-        return;
-
-    std::cout << std::fixed << std::setprecision(8);
-
-    std::cout << std::right << std::setw(14) << " Avg. RTT"
-              << " | " << std::setw(25) << "Throughput"
-              << " | " << std::setw(10) << " Errors"
-              << std::endl;
-
-    std::cout << std::right << std::setw(12) << rtt << " s"
-              << " | " << std::setw(18) << std::fixed << std::setprecision(2) << throughput << " Mbit/s"
-              << " | " << std::setw(10) << errorMessagesCount << std::endl
-              << std::endl;
 }
 
 void Benchmark::warmupCommunication(std::vector<std::pair<int, int>> subarrayIndices, int8_t rank)

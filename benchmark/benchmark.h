@@ -49,11 +49,11 @@ public:
     virtual void run() = 0;
 
 protected:
-    void allocateMemory();
+    timespec diff(timespec start, timespec end);
     std::vector<std::pair<int, int>> findSubarrayIndices(std::size_t messageSize);
     std::pair<double, double> calculateThroughput(timespec startTime, timespec endTime, std::size_t bytesTransferred, std::size_t iterations);
-    void printRunInfo(double rtt, double throughput, int errorMessagesCount); // TODO: remove from here and reuse
 
+    void allocateMemory();
     virtual void parseArguments(std::vector<ArgumentEntry> args) = 0;
 
     virtual void warmupCommunication(std::vector<std::pair<int, int>> subarrayIndices, int8_t rank);

@@ -9,7 +9,7 @@ public:
     void run() override;
 
 protected:
-    virtual void printIterationInfo(timespec startTime, timespec endTime, std::size_t transferredSize) = 0;
+    virtual void printIterationInfo(timespec startTime, timespec endTime, std::size_t transferredSize, std::size_t errorMessagesCount) = 0;
 
     CommunicationType m_commType = COMM_UNDEFINED;
     std::size_t m_messageSize = -1;

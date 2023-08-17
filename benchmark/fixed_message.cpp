@@ -20,7 +20,8 @@ BenchmarkFixedMessage::BenchmarkFixedMessage(std::vector<ArgumentEntry> args, in
     if (m_rank == 0)
     {
         std::cout << std::endl
-                  << "Performing fixed size benchmark." << std::endl << std::endl;
+                  << "Performing fixed size benchmark." << std::endl
+                  << std::endl;
 
         std::cout << std::left << std::setw(20) << "Message size:"
                   << std::right << std::setw(10) << m_messageSize << " B" << std::endl;
@@ -74,8 +75,28 @@ void BenchmarkFixedMessage::parseArguments(std::vector<ArgumentEntry> args)
     }
 }
 
-void BenchmarkFixedMessage::printIterationInfo(timespec startTime, timespec endTime, std::size_t transferredSize)
+void BenchmarkFixedMessage::printIterationInfo(timespec startTime, timespec endTime, std::size_t transferredSize, std::size_t errorMessagesCount)
 {
+    if (m_rank)
+        return;
+
+    timespec elapsedTime = diff(startTime, endTime);
+    double elapsedSecs = elapsedTime.tv_sec + (elapsedTime.tv_nsec / 1e9);
+
+    double avgRtt = elapsedSecs / m_iterations;
+    double avgThroughput = (transferredSize * 8.0) / (elapsedSecs * 1e6);
+
+    std::cout << std::fixed << std::setprecision(8);
+
+    std::cout << std::right << std::setw(14) << " Avg. RTT"
+              << " | " << std::setw(25) << "Throughput"
+              << " | " << std::setw(10) << " Errors"
+              << std::endl;
+
+    std::cout << std::right << std::setw(12) << avgRtt << " s"
+              << " | " << std::setw(18) << std::fixed << std::setprecision(2) << avgThroughput << " Mbit/s"
+              << " | " << std::setw(10) << errorMessagesCount << std::endl
+              << std::endl;
 }
 
 void BenchmarkFixedMessage::run()

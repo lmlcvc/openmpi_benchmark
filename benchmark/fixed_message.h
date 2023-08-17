@@ -13,7 +13,7 @@ public:
 
 private:
     void parseArguments(std::vector<ArgumentEntry> args) override;
-    void printIterationInfo(timespec startTime, timespec endTime, std::size_t transferredSize) override;
+    void printIterationInfo(timespec startTime, timespec endTime, std::size_t transferredSize, std::size_t errorMessagesCount) override;
 };
 
 #endif // BENCHMARKFIXEDMESSAGE_H

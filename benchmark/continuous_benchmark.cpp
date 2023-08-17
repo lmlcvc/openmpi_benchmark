@@ -29,7 +29,7 @@ void ContinuousBenchmark::run()
         clock_gettime(CLOCK_MONOTONIC, &endTime);
 
         if (m_rank == 0)
-            printIterationInfo(startTime, endTime, transferredSize);
+            printIterationInfo(startTime, endTime, transferredSize, errorMessageCount);
 
         /*if (sigintReceived)
         {
