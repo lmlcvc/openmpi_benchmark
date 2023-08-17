@@ -53,6 +53,32 @@ void printHelp()
     std::cout << "    -w <warmup iterations>   Set the number of warmup iterations.\n";
 }
 
+timespec diff(timespec start, timespec end)
+{
+    timespec time_diff;
+    if ((end.tv_nsec - start.tv_nsec) < 0)
+    {
+        time_diff.tv_sec = end.tv_sec - start.tv_sec - 1;
+        time_diff.tv_nsec = 1e9 + end.tv_nsec - start.tv_nsec;
+    }
+    else
+    {
+        time_diff.tv_sec = end.tv_sec - start.tv_sec;
+        time_diff.tv_nsec = end.tv_nsec - start.tv_nsec;
+    }
+    return time_diff;
+}
+
+void printElapsed(timespec runStartTime)
+{
+    timespec runEndTime;
+    clock_gettime(CLOCK_MONOTONIC, &runEndTime);
+    timespec elapsedTime = diff(runStartTime, runEndTime);
+    double elapsedSeconds = elapsedTime.tv_sec + (elapsedTime.tv_nsec / 1e9);
+
+    std::cout << "Finishing program. Total elapsed time: " << elapsedSeconds << " s" << std::endl;
+}
+
 void parseArguments(int argc, char **argv, int rank, CommunicationType &commType, std::vector<ArgumentEntry> &commArguments)
 {
     int opt;
@@ -129,7 +155,8 @@ int main(int argc, char **argv)
 
     std::unique_ptr<Benchmark> benchmark;
 
-    std::signal(SIGINT, handleSignals);
+    bool continueRun = true;
+    timespec runStartTime;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -150,6 +177,7 @@ int main(int argc, char **argv)
     if (commType == COMM_SCAN)
     {
         benchmark = std::make_unique<ScanBenchmark>(commArguments, rank);
+        continueRun = false;
     }
     else if (commType == COMM_FIXED_BLOCKING)
     {
@@ -167,8 +195,23 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    std::signal(SIGINT, [](int signal)
+                { handleSignals(signal); });
+
     // Run program
-    benchmark->run();
+    clock_gettime(CLOCK_MONOTONIC, &runStartTime);
+    do
+    {
+        benchmark->run();
+
+        if (sigintReceived)
+        {
+            if (rank == 0)
+                printElapsed(runStartTime);
+            MPI_Finalize();
+            std::exit(EXIT_SUCCESS);
+        }
+    } while (continueRun);
 
     // Finalise program
     MPI_Finalize();
