@@ -70,46 +70,59 @@ std::size_t CommunicationInterface::blockingCommunication(int8_t *bufferSnd, int
     return errorMessageCount;
 }
 
+std::size_t CommunicationInterface::nonBlockingCommunication(int8_t *bufferSnd, int8_t *bufferRcv,
+                                                             std::size_t sndBufferBytes, std::size_t rcvBufferBytes,
+                                                             std::size_t messageSize, int rank, std::size_t iterations, std::size_t *transferredSize)
+{
+    return 0;
+}
+
 std::size_t CommunicationInterface::variableBlockingCommunication(int8_t *bufferSnd, int8_t *bufferRcv,
                                                                   std::size_t sndBufferBytes, std::size_t rcvBufferBytes,
                                                                   std::vector<std::size_t> messageSizes, int rank, std::size_t iterations, std::size_t *transferredSize)
 {
     std::vector<MPI_Status> statuses(iterations);
     std::size_t sendOffset = 0, recvOffset = 0;
-    std::size_t messageSize, remainingSize, wrapSize, remainingToReceive, chunkSize;
-    std::size_t errorMessageCount = 0;
-
-    std::random_device rd;
-    std::mt19937 generator(rd());
-    std::uniform_int_distribution<std::size_t> sizeDistribution(0, messageSizes.size() - 1);
+    std::size_t remainingSize, wrapSize, remainingToReceive, chunkSize;
 
     if (rank == 0)
     {
+        int sndMessageSize;
+        std::random_device rd;
+        std::mt19937 generator(rd());
+        std::uniform_int_distribution<std::size_t> sizeDistribution(0, messageSizes.size() - 1);
+
         for (std::size_t i = 0; i < iterations; i++)
         {
-            messageSize = messageSizes[sizeDistribution(generator)];
+            sndMessageSize = static_cast<int>(messageSizes[sizeDistribution(generator)]);
 
-            if (sendOffset + messageSize > sndBufferBytes)
+            MPI_Send(&sndMessageSize, 1, MPI_INT, 1, 0, MPI_COMM_WORLD); // Communicate the messageSize to rank 1
+
+            if (sendOffset + sndMessageSize > sndBufferBytes)
             {
                 remainingSize = sndBufferBytes - sendOffset;
-                wrapSize = messageSize - remainingSize;
+                wrapSize = sndMessageSize - remainingSize;
 
                 MPI_Send(bufferSnd + sendOffset, remainingSize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
                 sendOffset = 0;
                 MPI_Send(bufferSnd + sendOffset, wrapSize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
             }
             else
-                MPI_Send(bufferSnd + sendOffset, messageSize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
+                MPI_Send(bufferSnd + sendOffset, sndMessageSize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
 
-            sendOffset = (sendOffset + messageSize) % sndBufferBytes;
+            sendOffset = (sendOffset + sndMessageSize) % sndBufferBytes;
         }
     }
     else if (rank == 1)
     {
+        std::size_t rcvMessageSize;
+
         for (std::size_t i = 0; i < iterations; i++)
         {
+            MPI_Recv(&rcvMessageSize, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE); // Receive the messageSize from rank 0
+
             MPI_Status status;
-            remainingToReceive = messageSize;
+            remainingToReceive = rcvMessageSize;
 
             while (remainingToReceive > 0)
             {
@@ -124,14 +137,19 @@ std::size_t CommunicationInterface::variableBlockingCommunication(int8_t *buffer
                 remainingToReceive -= chunkSize;
             }
 
-            if (statuses[i].MPI_ERROR != MPI_SUCCESS)
-                errorMessageCount++;
+            if (statuses[i].MPI_ERROR == MPI_SUCCESS)
+                *transferredSize += rcvMessageSize;
         }
     }
-
-    *transferredSize -= messageSize * errorMessageCount;
 
     return std::count_if(statuses.begin(), statuses.end(),
                          [](const MPI_Status &status)
                          { return status.MPI_ERROR != MPI_SUCCESS; });
+}
+
+std::size_t variableNonBlockingCommunication(int8_t *bufferSnd, int8_t *bufferRcv,
+                                             std::size_t sndBufferBytes, std::size_t rcvBufferBytes,
+                                             std::vector<std::size_t> messageSizes, int rank, std::size_t iterations, std::size_t *transferredSize)
+{
+    return 0;
 }
