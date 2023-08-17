@@ -92,7 +92,7 @@ void ScanBenchmark::run()
         clock_gettime(CLOCK_MONOTONIC, &endTime);
         std::tie(std::ignore, avgThroughput) = calculateThroughput(startTime, endTime, transferredSize, m_iterations);
 
-        printRunInfo(currentMessageSize, avgThroughput); // TODO: own print function
+        printRunInfo(currentMessageSize, avgThroughput);
     }
 
     if (m_rank == 0)

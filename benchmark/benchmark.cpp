@@ -106,7 +106,6 @@ void Benchmark::performWarmup()
     std::vector<std::pair<int, int>> subarrayIndices = findSubarrayIndices(m_sndBufferBytes);
 
     clock_gettime(CLOCK_MONOTONIC, &startTime);
-    // TODO: monitor errors in warmup
     CommunicationInterface::blockingCommunication(m_bufferSnd, m_bufferRcv, m_sndBufferBytes, m_rcvBufferBytes,
                                                   messageSize, m_rank, m_warmupIterations, &transferredSize);
     clock_gettime(CLOCK_MONOTONIC, &endTime);

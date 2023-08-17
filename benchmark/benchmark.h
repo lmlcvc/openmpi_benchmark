@@ -37,11 +37,6 @@ enum CommunicationType
     COMM_VARIABLE_NONBLOCKING
 };
 
-// TODO: handle recieve buffer and message size relation
-// (cannot make the recieved stuff exceed buffer)
-// either handle sizes or recieve in loop
-
-// XXX: look into loop recieve - same for send
 class Benchmark : public CommunicationInterface
 {
 public:
