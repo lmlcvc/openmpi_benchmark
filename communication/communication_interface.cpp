@@ -96,7 +96,7 @@ std::size_t CommunicationInterface::variableBlockingCommunication(int8_t *buffer
         {
             sndMessageSize = static_cast<int>(messageSizes[sizeDistribution(generator)]);
 
-            MPI_Send(&sndMessageSize, 1, MPI_INT, 1, 0, MPI_COMM_WORLD); // Communicate the messageSize to rank 1
+            MPI_Send(&sndMessageSize, 1, MPI_INT, 1, 0, MPI_COMM_WORLD); // Communicate message size over network
 
             if (sendOffset + sndMessageSize > sndBufferBytes)
             {
