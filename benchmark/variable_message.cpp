@@ -70,18 +70,30 @@ void BenchmarkVariableMessage::initMessageSizes()
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::mt19937 generator(seed);
 
-    int lowerBound = 1e4;
-    int upperBound = m_sndBufferBytes;
+    std::size_t lowerBound = 1e4;
+    std::size_t upperBound = m_sndBufferBytes;
 
-    int expectedValue = 1 << 18; // FIXME: not if sndBufferBytes is something else, do it with shifts
-    // also print that
-    int shiftFactor = expectedValue - (upperBound + lowerBound) / 2;
+    if (upperBound < lowerBound)
+    {
+        std::cout << "Send buffer size must be larger than 10000 B. Exiting.";
+        MPI_Finalize();
+        std::exit(1);
+    }
 
-    std::uniform_int_distribution<int> distribution(lowerBound + shiftFactor, upperBound + shiftFactor);
+    std::size_t expectedValue = 1 << static_cast<int>((std::log2(lowerBound) + std::log2(upperBound)) / 2);
+    std::size_t shiftFactor = expectedValue - (upperBound + lowerBound) / 2;
+
+    double stdDeviation = static_cast<double>(upperBound - lowerBound) / 6.0;
+
+    std::normal_distribution<double> distribution(expectedValue + shiftFactor, stdDeviation);
 
     m_messageSizes.clear();
-    for (size_t i = 0; i < 100; i++)
-        m_messageSizes.push_back(distribution(generator));
+    for (size_t i = 0; i < m_messageSizeVariants; i++)
+    {
+        std::size_t messageSize = std::round(distribution(generator));
+        messageSize = std::max(lowerBound, std::min(upperBound, messageSize)); // Ensure value is within range
+        m_messageSizes.push_back(messageSize);
+    }
 }
 
 void BenchmarkVariableMessage::printIterationInfo(timespec startTime, timespec endTime, std::size_t transferredSize, std::size_t errorMessagesCount)
