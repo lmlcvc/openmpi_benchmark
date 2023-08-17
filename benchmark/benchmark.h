@@ -18,6 +18,7 @@
 #include <vector>
 #include <cstring>
 #include <algorithm>
+#include <functional>
 
 #include "../communication/communication_interface.h"
 
@@ -61,8 +62,10 @@ protected:
 
     const std::size_t m_minIterations = 1e5;
 
-    void *memSnd = nullptr;
-    void *memRcv = nullptr;
+    typedef std::unique_ptr<void, std::function<void(void*)>> buffer_t;
+
+    buffer_t m_memSndPtr;
+    buffer_t m_memRcvPtr;
 
     std::size_t m_sndBufferBytes = 1e7;
     std::size_t m_rcvBufferBytes = 1e7;

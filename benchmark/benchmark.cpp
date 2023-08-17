@@ -48,6 +48,9 @@ void Benchmark::allocateMemory()
 {
     const long pageSize = sysconf(_SC_PAGESIZE);
 
+    void *memSnd = nullptr;
+    void *memRcv = nullptr;
+
     if (posix_memalign(&memSnd, pageSize, m_sndBufferBytes) != 0 || posix_memalign(&memRcv, pageSize, m_rcvBufferBytes) != 0)
     {
         std::cerr << "Memory allocation failed" << std::endl;
@@ -60,11 +63,8 @@ void Benchmark::allocateMemory()
 
     m_bufferRcv = static_cast<int8_t *>(memRcv);
 
-    MPI_Bcast(&memSnd, sizeof(void *), MPI_BYTE, 0, MPI_COMM_WORLD);
-    std::unique_ptr<void, decltype(&free)> memSndPtr(m_rank == 0 ? memSnd : nullptr, &free);
-
-    MPI_Bcast(&memRcv, sizeof(void *), MPI_BYTE, 0, MPI_COMM_WORLD);
-    std::unique_ptr<void, decltype(&free)> memRcvPtr(m_rank == 0 ? memRcv : nullptr, &free);
+    m_memSndPtr = buffer_t(memSnd, free);
+    m_memRcvPtr = buffer_t(memRcv, free);
 }
 
 void Benchmark::warmupCommunication(std::vector<std::pair<int, int>> subarrayIndices, int8_t rank)
@@ -111,7 +111,8 @@ void Benchmark::performWarmup()
     clock_gettime(CLOCK_MONOTONIC, &endTime);
     std::tie(std::ignore, throughput) = calculateThroughput(startTime, endTime, transferredSize, m_warmupIterations);
 
-    std::cout << "\nPre-warmup throughput: " << throughput << " Mbit/s" << std::endl;
+    if (m_rank == 0)
+        std::cout << "\nPre-warmup throughput: " << throughput << " Mbit/s" << std::endl;
 
     warmupCommunication(subarrayIndices, m_rank);
 
@@ -122,6 +123,7 @@ void Benchmark::performWarmup()
     clock_gettime(CLOCK_MONOTONIC, &endTime);
     std::tie(std::ignore, throughput) = calculateThroughput(startTime, endTime, transferredSize, m_warmupIterations);
 
-    std::cout << "Post-warmup throughput: " << throughput << " Mbit/s\n"
-              << std::endl;
+    if (m_rank == 0)
+        std::cout << "Post-warmup throughput: " << throughput << " Mbit/s\n"
+                  << std::endl;
 }
