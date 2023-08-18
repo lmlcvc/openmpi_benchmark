@@ -2,8 +2,6 @@
 
 void ContinuousBenchmark::run()
 {
-    performWarmup();
-
     timespec startTime, endTime;
     std::size_t errorMessageCount = 0;
     std::size_t transferredSize;
@@ -35,6 +33,5 @@ void ContinuousBenchmark::run()
 
     clock_gettime(CLOCK_MONOTONIC, &endTime);
 
-    if (m_rank == 0)
-        printIterationInfo(startTime, endTime, transferredSize, errorMessageCount);
+    printIterationInfo(startTime, endTime, transferredSize, errorMessageCount);
 }

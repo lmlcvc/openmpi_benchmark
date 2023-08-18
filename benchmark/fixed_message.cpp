@@ -99,6 +99,3 @@ void BenchmarkFixedMessage::printIterationInfo(timespec startTime, timespec endT
               << std::endl;
 }
 
-void BenchmarkFixedMessage::run()
-{
-}

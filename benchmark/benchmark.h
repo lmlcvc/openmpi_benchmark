@@ -44,6 +44,8 @@ public:
     virtual ~Benchmark() {}
     virtual void run() = 0;
 
+    void performWarmup();
+
 protected:
     timespec diff(timespec start, timespec end);
     std::vector<std::pair<int, int>> findSubarrayIndices(std::size_t messageSize);
@@ -53,7 +55,6 @@ protected:
     virtual void parseArguments(std::vector<ArgumentEntry> args) = 0;
 
     virtual void warmupCommunication(std::vector<std::pair<int, int>> subarrayIndices, int8_t rank);
-    void performWarmup();
 
     int m_rank;
 
@@ -62,7 +63,7 @@ protected:
 
     const std::size_t m_minIterations = 1e5;
 
-    typedef std::unique_ptr<void, std::function<void(void*)>> buffer_t;
+    typedef std::unique_ptr<void, std::function<void(void *)>> buffer_t;
 
     buffer_t m_memSndPtr;
     buffer_t m_memRcvPtr;

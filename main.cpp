@@ -129,6 +129,7 @@ void parseArguments(int argc, char **argv, int rank, CommunicationType &commType
             if (commType == COMM_FIXED_BLOCKING)
                 commType = COMM_FIXED_NONBLOCKING;
             nonblocking = true;
+            break;
         case 'm':
         case 'i':
         case 'b':
@@ -161,6 +162,8 @@ int main(int argc, char **argv)
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    //MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
 
     // Run setup
     std::cout << "Initialised rank " << rank << std::endl;
@@ -200,6 +203,7 @@ int main(int argc, char **argv)
 
     // Run program
     clock_gettime(CLOCK_MONOTONIC, &runStartTime);
+    benchmark->performWarmup();
     do
     {
         benchmark->run();

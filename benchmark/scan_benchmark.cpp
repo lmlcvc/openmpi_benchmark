@@ -62,8 +62,6 @@ void ScanBenchmark::printRunInfo(std::size_t messageSize, double throughput)
 
 void ScanBenchmark::run()
 {
-    performWarmup();
-
     if (m_rank == 0)
     {
         std::cout << std::fixed << std::setprecision(2);
@@ -96,6 +94,6 @@ void ScanBenchmark::run()
     }
 
     if (m_rank == 0)
-        std::cout << "Number of non-MPI_SUCCESS statuses: " << errorMessageCount << "\n"
+        std::cout << "\nNumber of non-MPI_SUCCESS statuses: " << errorMessageCount << "\n"
                   << std::endl;
 }

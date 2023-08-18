@@ -11,8 +11,6 @@ public:
     BenchmarkVariableMessage(std::vector<ArgumentEntry> args, int rank, CommunicationType commType);
     virtual ~BenchmarkVariableMessage() override {}
 
-    void run() override;
-
 private:
     void initMessageSizes();
     void printIterationInfo(timespec startTime, timespec endTime, std::size_t transferredSize, std::size_t errorMessagesCount) override;
