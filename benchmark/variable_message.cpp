@@ -80,18 +80,13 @@ void BenchmarkVariableMessage::initMessageSizes()
         std::exit(1);
     }
 
-    std::size_t expectedValue = 1 << static_cast<int>((std::log2(lowerBound) + std::log2(upperBound)) / 2);
-    std::size_t shiftFactor = expectedValue - (upperBound + lowerBound) / 2;
-
-    double stdDeviation = static_cast<double>(upperBound - lowerBound) / 6.0;
-
-    std::normal_distribution<double> distribution(expectedValue + shiftFactor, stdDeviation);
+    std::uniform_real_distribution<double> distribution(0.0, 1.0);
 
     m_messageSizes.clear();
     for (size_t i = 0; i < m_messageSizeVariants; i++)
     {
-        std::size_t messageSize = std::round(distribution(generator));
-        messageSize = std::max(lowerBound, std::min(upperBound, messageSize)); // Ensure value is within range
+        double randomValue = distribution(generator);
+        std::size_t messageSize = std::round(randomValue * (upperBound - lowerBound) + lowerBound);
         m_messageSizes.push_back(messageSize);
     }
 }
@@ -115,8 +110,4 @@ void BenchmarkVariableMessage::printIterationInfo(timespec startTime, timespec e
     std::cout << std::right << std::setw(18) << std::fixed << std::setprecision(2) << avgThroughput << " Mbit/s"
               << " | " << std::setw(10) << errorMessagesCount << std::endl
               << std::endl;
-}
-
-void BenchmarkVariableMessage::run()
-{
 }
