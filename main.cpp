@@ -83,7 +83,7 @@ void parseArguments(int argc, char **argv, int rank, CommunicationType &commType
 {
     int opt;
     bool nonblocking = false;
-    while ((opt = getopt(argc, argv, "m:i:b:w:sfvnh")) != -1)
+    while ((opt = getopt(argc, argv, "m:i:b:w:sfvr:nh")) != -1)
     {
         switch (opt)
         {
@@ -114,7 +114,7 @@ void parseArguments(int argc, char **argv, int rank, CommunicationType &commType
         case 'v':
             if (commType == COMM_UNDEFINED)
             {
-                commType = nonblocking ? COMM_VARIABLE_NONBLOCKING : COMM_VARIABLE_BLOCKING;
+                commType = COMM_VARIABLE_BLOCKING;
             }
             else if (rank == 0)
             {
@@ -124,10 +124,6 @@ void parseArguments(int argc, char **argv, int rank, CommunicationType &commType
             }
             break;
         case 'n':
-            if (commType == COMM_VARIABLE_BLOCKING)
-                commType = COMM_VARIABLE_NONBLOCKING;
-            if (commType == COMM_FIXED_BLOCKING)
-                commType = COMM_FIXED_NONBLOCKING;
             nonblocking = true;
             break;
         case 'm':
@@ -146,7 +142,16 @@ void parseArguments(int argc, char **argv, int rank, CommunicationType &commType
             std::exit(1);
         }
     }
+
+    // If -n flag is present, update the communication type
+    if (nonblocking) {
+        if (commType == COMM_VARIABLE_BLOCKING)
+            commType = COMM_VARIABLE_NONBLOCKING;
+        if (commType == COMM_FIXED_BLOCKING)
+            commType = COMM_FIXED_NONBLOCKING;
+    }
 }
+
 
 int main(int argc, char **argv)
 {
@@ -182,11 +187,12 @@ int main(int argc, char **argv)
         benchmark = std::make_unique<ScanBenchmark>(commArguments, rank);
         continueRun = false;
     }
-    else if (commType == COMM_FIXED_BLOCKING)
+    else if (commType == COMM_FIXED_BLOCKING || commType == COMM_FIXED_NONBLOCKING)
     {
         benchmark = std::make_unique<BenchmarkFixedMessage>(commArguments, rank, commType);
     }
-    else if (commType == COMM_VARIABLE_BLOCKING)
+    
+    else if (commType == COMM_VARIABLE_BLOCKING || commType == COMM_VARIABLE_NONBLOCKING)
     {
         benchmark = std::make_unique<BenchmarkVariableMessage>(commArguments, rank, commType);
     }

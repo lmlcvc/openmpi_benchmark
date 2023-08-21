@@ -19,9 +19,8 @@ void ContinuousBenchmark::run()
     }
     else if (m_commType == COMM_FIXED_NONBLOCKING)
     {
-        // TODO: change to nonblocking when implemented
-        std::pair<std::size_t, std::size_t> result = CommunicationInterface::blockingCommunication(m_bufferSnd, m_bufferRcv, m_sndBufferBytes, m_rcvBufferBytes,
-                                                                                                   m_messageSize, m_rank, m_iterations);
+        std::pair<std::size_t, std::size_t> result = CommunicationInterface::nonBlockingCommunication(m_bufferSnd, m_bufferRcv, m_sndBufferBytes, m_rcvBufferBytes,
+                                                                                                   m_messageSize, m_rank, m_iterations, m_syncIterations);
         errorMessageCount = result.first;
         transferredSize = result.second;
     }

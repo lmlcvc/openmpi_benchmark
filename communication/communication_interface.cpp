@@ -1,5 +1,3 @@
-#include <iostream>
-
 #include "communication_interface.h"
 
 std::pair<std::size_t, std::size_t> CommunicationInterface::blockingCommunication(int8_t *bufferSnd, int8_t *bufferRcv,
@@ -56,6 +54,7 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::blockingCommunicatio
     return std::make_pair(errorMessageCount, transferredSize);
 }
 
+// XXX: 3600 Mbit/s throughput
 std::pair<std::size_t, std::size_t> CommunicationInterface::nonBlockingCommunication(int8_t *bufferSnd, int8_t *bufferRcv,
                                                                                      std::size_t sndBufferBytes, std::size_t rcvBufferBytes,
                                                                                      std::size_t messageSize, int rank, std::size_t iterations, std::size_t syncIterations)
@@ -78,6 +77,9 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::nonBlockingCommunica
             MPI_Isend(bufferSnd + sendOffset, messageSize, MPI_BYTE, 1, 0, MPI_COMM_WORLD, &sendRequests[i]);
 
             sendOffset = (sendOffset + messageSize) % sndBufferBytes;
+
+            if (iterations % syncIterations == 0)
+                MPI_Waitall(i + 1, sendRequests.data(), MPI_STATUSES_IGNORE);
         }
         else if (rank == 1)
         {
@@ -87,13 +89,6 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::nonBlockingCommunica
             MPI_Irecv(bufferRcv + recvOffset, messageSize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &recvRequests[i]);
 
             recvOffset = (recvOffset + messageSize) % sndBufferBytes;
-        }
-
-        if ((i + 1) % syncIterations == 0 || i == iterations - 1)
-        {
-            // Wait for communication of the last syncIterations or at the end
-            MPI_Waitall(i + 1, sendRequests.data(), MPI_STATUSES_IGNORE);
-            MPI_Waitall(i + 1, recvRequests.data(), statuses.data());
         }
     }
 
