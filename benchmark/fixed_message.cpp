@@ -77,7 +77,7 @@ void BenchmarkFixedMessage::parseArguments(std::vector<ArgumentEntry> args)
 
 void BenchmarkFixedMessage::printIterationInfo(timespec startTime, timespec endTime, std::size_t transferredSize, std::size_t errorMessagesCount)
 {
-    if (m_rank)
+    if (m_rank == 1)
         return;
 
     timespec elapsedTime = diff(startTime, endTime);

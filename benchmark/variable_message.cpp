@@ -15,7 +15,7 @@ BenchmarkVariableMessage::BenchmarkVariableMessage(std::vector<ArgumentEntry> ar
     {
         std::cout << std::endl
                   << "Performing variable size benchmark." << std::endl
-                  << "Available sizes: " << m_messageSizeVariants << " (range: 10000 B - " << m_sndBufferBytes << " B" << std::endl;
+                  << "Available sizes: " << m_messageSizeVariants << " (range: 10000 B - " << m_sndBufferBytes << " B)" << std::endl;
 
         std::cout << std::endl
                   << std::left << std::setw(20) << "Send buffer size:"
