@@ -9,6 +9,8 @@ BenchmarkVariableMessage::BenchmarkVariableMessage(std::vector<ArgumentEntry> ar
 
     initMessageSizes();
 
+    allocateMemory();
+
     if (m_rank == 0)
     {
         std::cout << std::endl
