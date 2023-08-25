@@ -98,6 +98,7 @@ void Benchmark::warmupCommunication(std::vector<std::pair<int, int>> subarrayInd
 
 void Benchmark::performWarmup()
 {
+    int buRank;
     timespec startTime, endTime;
     double throughput;
     std::size_t messageSize = m_sndBufferBytes / 10;
@@ -106,30 +107,41 @@ void Benchmark::performWarmup()
     std::vector<std::pair<int, int>> subarrayIndices = findSubarrayIndices(m_sndBufferBytes);
 
     clock_gettime(CLOCK_MONOTONIC, &startTime);
-    std::pair<std::size_t, std::size_t> result = CommunicationInterface::blockingCommunication(m_bufferSnd, m_bufferRcv, m_sndBufferBytes, m_rcvBufferBytes,
-                                                                                            messageSize, m_rank, m_warmupIterations);
-    transferredSize = result.second; 
-    
+    for (int ruRank = 0; ruRank < m_nodesCount; ruRank++)
+    {
+        if (m_rank == ruRank || m_rank == buRank)
+        {
+            std::pair<std::size_t, std::size_t> result = CommunicationInterface::unitsBlockingCommunication(m_readoutUnit.get(), m_builderUnit.get(), ruRank, ruRank, m_rank,
+                                                                                                            messageSize, m_warmupIterations);
+            transferredSize += result.second;
+        }
+    }
+
     clock_gettime(CLOCK_MONOTONIC, &endTime);
     std::tie(std::ignore, throughput) = calculateThroughput(startTime, endTime, transferredSize, m_warmupIterations);
 
     if (m_rank == 0)
-        std::cout << "\nPre-warmup throughput: " << throughput << " Mbit/s" << std::endl;
+        std::cout << "\nAvg. pre-warmup throughput: " << throughput << " Mbit/s" << std::endl;
 
     warmupCommunication(subarrayIndices, m_rank);
 
     transferredSize = 0;
     clock_gettime(CLOCK_MONOTONIC, &startTime);
 
-    result = CommunicationInterface::blockingCommunication(m_bufferSnd, m_bufferRcv, m_sndBufferBytes, m_rcvBufferBytes,
-                                                           messageSize, m_rank, m_warmupIterations);
-    transferredSize = result.second; 
+    for (int ruRank = 0; ruRank < m_nodesCount; ruRank++)
+    {
+        if (m_rank == ruRank || m_rank == buRank)
+        {
+            std::pair<std::size_t, std::size_t> result = CommunicationInterface::unitsBlockingCommunication(m_readoutUnit.get(), m_builderUnit.get(), ruRank, ruRank, m_rank,
+                                                                                                            messageSize, m_warmupIterations);
+            transferredSize += result.second;
+        }
+    }
     clock_gettime(CLOCK_MONOTONIC, &endTime);
 
     std::tie(std::ignore, throughput) = calculateThroughput(startTime, endTime, transferredSize, m_warmupIterations);
 
     if (m_rank == 0)
-        std::cout << "Post-warmup throughput: " << throughput << " Mbit/s\n"
+        std::cout << "Avg. post-warmup throughput: " << throughput << " Mbit/s\n"
                   << std::endl;
 }
-

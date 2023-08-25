@@ -13,7 +13,8 @@ public:
 
 private:
     void initMessageSizes();
-    void printIterationInfo(timespec startTime, timespec endTime, std::size_t transferredSize, std::size_t errorMessagesCount) override;
+    void printIterationInfo(timespec startTime, timespec endTime, int ruRank, int buRank,
+                            std::size_t transferredSize, std::size_t errorMessagesCount) override;
     void parseArguments(std::vector<ArgumentEntry> args) override;
 
     std::size_t m_messageSizeVariants = 100;

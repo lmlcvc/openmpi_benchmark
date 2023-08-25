@@ -1,8 +1,9 @@
 #include "fixed_message.h"
 
-BenchmarkFixedMessage::BenchmarkFixedMessage(std::vector<ArgumentEntry> args, int rank, CommunicationType commType)
+BenchmarkFixedMessage::BenchmarkFixedMessage(std::vector<ArgumentEntry> args, int rank, int size, CommunicationType commType)
 {
     m_rank = rank;
+    m_nodesCount = size;
     m_commType = commType;
     m_messageSize = 1e5;
 
@@ -35,6 +36,9 @@ BenchmarkFixedMessage::BenchmarkFixedMessage(std::vector<ArgumentEntry> args, in
         std::cout << std::left << std::setw(20) << "Number of iterations:"
                   << std::right << std::setw(9) << m_iterations << std::endl;
     }
+
+    m_readoutUnit = std::make_unique<ReadoutUnit>(rank);
+    m_builderUnit = std::make_unique<BuilderUnit>(rank);
 }
 
 void BenchmarkFixedMessage::parseArguments(std::vector<ArgumentEntry> args)
@@ -75,11 +79,9 @@ void BenchmarkFixedMessage::parseArguments(std::vector<ArgumentEntry> args)
     }
 }
 
-void BenchmarkFixedMessage::printIterationInfo(timespec startTime, timespec endTime, std::size_t transferredSize, std::size_t errorMessagesCount)
+void BenchmarkFixedMessage::printIterationInfo(timespec startTime, timespec endTime, int ruRank, int buRank,
+                                               std::size_t transferredSize, std::size_t errorMessagesCount)
 {
-    if (m_rank == 1)
-        return;
-
     timespec elapsedTime = diff(startTime, endTime);
     double elapsedSecs = elapsedTime.tv_sec + (elapsedTime.tv_nsec / 1e9);
 
@@ -88,14 +90,19 @@ void BenchmarkFixedMessage::printIterationInfo(timespec startTime, timespec endT
 
     std::cout << std::fixed << std::setprecision(8);
 
-    std::cout << std::right << std::setw(14) << " Avg. RTT"
-              << " | " << std::setw(25) << "Throughput"
+    std::cout << std::right << std::setw(7) << "Phase"
+              << " | " << std::setw(7) << "RU"
+              << " | " << std::setw(7) << "BU"
+              << " | " << std::setw(14) << " Avg. RTT"
+              << " | " << std::setw(18) << "Throughput"
               << " | " << std::setw(10) << " Errors"
               << std::endl;
 
-    std::cout << std::right << std::setw(12) << avgRtt << " s"
-              << " | " << std::setw(18) << std::fixed << std::setprecision(2) << avgThroughput << " Mbit/s"
+    std::cout << std::right << std::setw(7) << m_currentPhase
+              << " | " << std::setw(7) << ruRank
+              << " | " << std::setw(7) << buRank
+              << " | " << std::setw(12) << avgRtt << " s"
+              << " | " << std::setw(11) << std::fixed << std::setprecision(2) << avgThroughput << " Mbit/s"
               << " | " << std::setw(10) << errorMessagesCount << std::endl
               << std::endl;
 }
-

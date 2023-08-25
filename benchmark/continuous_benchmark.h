@@ -9,14 +9,15 @@ public:
     void run() override;
 
 protected:
-    virtual void printIterationInfo(timespec startTime, timespec endTime, std::size_t transferredSize, std::size_t errorMessagesCount) = 0;
+    virtual void printIterationInfo(timespec startTime, timespec endTime, int ruRank, int buRank,
+                                    std::size_t transferredSize, std::size_t errorMessagesCount) = 0;
 
     CommunicationType m_commType = COMM_UNDEFINED;
     std::size_t m_messageSize = -1;
     std::vector<std::size_t> m_messageSizes;
 
     const std::size_t minMessageSize = 1e4;
-    std::size_t m_syncIterations = 1e4;       // TODO: calculate or parametrise
+    std::size_t m_syncIterations = 1e4; // TODO: calculate or parametrise
 };
 
 #endif // CONTINUOUSBENCHMARK_H

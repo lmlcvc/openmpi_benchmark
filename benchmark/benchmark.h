@@ -21,6 +21,8 @@
 #include <functional>
 
 #include "../communication/communication_interface.h"
+#include "../unit/readout_unit.h"
+#include "../unit/builder_unit.h"
 
 struct ArgumentEntry
 {
@@ -57,6 +59,8 @@ protected:
     virtual void warmupCommunication(std::vector<std::pair<int, int>> subarrayIndices, int8_t rank);
 
     int m_rank;
+    int m_nodesCount;
+    std::size_t m_currentPhase = 0;
 
     std::size_t m_iterations = 1e5;       // communication steps to be printed
     std::size_t m_warmupIterations = 100; // iteration count for warmup-related throughput calculation
@@ -74,6 +78,9 @@ protected:
 
     int8_t *m_bufferSnd;
     int8_t *m_bufferRcv;
+
+    std::unique_ptr<ReadoutUnit> m_readoutUnit;
+    std::unique_ptr<BuilderUnit> m_builderUnit;
 };
 
 #endif // BENCHMARK_H

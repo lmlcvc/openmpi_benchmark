@@ -144,14 +144,14 @@ void parseArguments(int argc, char **argv, int rank, CommunicationType &commType
     }
 
     // If -n flag is present, update the communication type
-    if (nonblocking) {
+    if (nonblocking)
+    {
         if (commType == COMM_VARIABLE_BLOCKING)
             commType = COMM_VARIABLE_NONBLOCKING;
         if (commType == COMM_FIXED_BLOCKING)
             commType = COMM_FIXED_NONBLOCKING;
     }
 }
-
 
 int main(int argc, char **argv)
 {
@@ -173,13 +173,6 @@ int main(int argc, char **argv)
     // Run setup
     std::cout << "Initialised rank " << rank << std::endl;
 
-    if (size != 2)
-    {
-        std::cerr << "This benchmark requires exactly 2 processes!" << std::endl;
-        MPI_Finalize();
-        return 1;
-    }
-
     // Benchmark object initialisation
     parseArguments(argc, argv, rank, commType, commArguments);
     if (commType == COMM_SCAN)
@@ -189,9 +182,9 @@ int main(int argc, char **argv)
     }
     else if (commType == COMM_FIXED_BLOCKING || commType == COMM_FIXED_NONBLOCKING)
     {
-        benchmark = std::make_unique<BenchmarkFixedMessage>(commArguments, rank, commType);
+        benchmark = std::make_unique<BenchmarkFixedMessage>(commArguments, rank, size, commType);
     }
-    
+
     else if (commType == COMM_VARIABLE_BLOCKING || commType == COMM_VARIABLE_NONBLOCKING)
     {
         benchmark = std::make_unique<BenchmarkVariableMessage>(commArguments, rank, commType);

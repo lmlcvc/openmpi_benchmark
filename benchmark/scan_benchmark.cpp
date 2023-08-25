@@ -99,3 +99,4 @@ void ScanBenchmark::run()
         std::cout << "\nNumber of non-MPI_SUCCESS statuses: " << errorMessageCount << "\n"
                   << std::endl;
 }
+

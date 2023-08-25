@@ -33,15 +33,58 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::blockingCommunicatio
 
             recvOffset = (recvOffset + messageSize) % sndBufferBytes;
         }
+    }
 
-        errorMessageCount = std::count_if(statuses.begin(), statuses.end(),
-                                          [](const MPI_Status &status)
-                                          { return status.MPI_ERROR != MPI_SUCCESS; });
+    errorMessageCount = std::count_if(statuses.begin(), statuses.end(),
+                                      [](const MPI_Status &status)
+                                      { return status.MPI_ERROR != MPI_SUCCESS; });
 
-        transferredSize -= messageSize * errorMessageCount;
+    transferredSize -= messageSize * errorMessageCount;
 
-        // Return both error message count and transferred size.
-        return std::make_pair(errorMessageCount, transferredSize);
+    // Return both error message count and transferred size.
+    return std::make_pair(errorMessageCount, transferredSize);
+}
+
+std::pair<std::size_t, std::size_t> CommunicationInterface::unitsBlockingCommunication(ReadoutUnit *ru, BuilderUnit *bu, int ruRank, int buRank, int processRank,
+                                                                                       std::size_t messageSize, std::size_t iterations)
+{
+
+    std::vector<MPI_Status> statuses(iterations);
+
+    std::size_t errorMessageCount = 0;
+    std::size_t transferredSize = messageSize * iterations;
+
+    if (processRank == ruRank)
+    {
+        int8_t *bufferSnd = ru->getBuffer();
+        const std::size_t sndBufferBytes = ru->getBufferBytes();
+        std::size_t sendOffset = 0;
+
+        for (std::size_t i = 0; i < iterations; i++)
+        {
+            if (sendOffset + messageSize > sndBufferBytes)
+                sendOffset = 0;
+
+            MPI_Send(bufferSnd + sendOffset, messageSize, MPI_BYTE, buRank, 0, MPI_COMM_WORLD);
+
+            sendOffset = (sendOffset + messageSize) % sndBufferBytes;
+        }
+    }
+    else if (processRank == buRank)
+    {
+        int8_t *bufferRcv = bu->getBuffer();
+        const std::size_t rcvBufferBytes = bu->getBufferBytes();
+        std::size_t recvOffset = 0;
+
+        for (std::size_t i = 0; i < iterations; i++)
+        {
+            if (recvOffset + messageSize > rcvBufferBytes)
+                recvOffset = 0;
+
+            MPI_Recv(bufferRcv + recvOffset, messageSize, MPI_BYTE, ruRank, 0, MPI_COMM_WORLD, &statuses[i]);
+
+            recvOffset = (recvOffset + messageSize) % rcvBufferBytes;
+        }
     }
 
     errorMessageCount = std::count_if(statuses.begin(), statuses.end(),
