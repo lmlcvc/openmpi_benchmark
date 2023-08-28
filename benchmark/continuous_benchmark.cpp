@@ -2,12 +2,6 @@
 
 void ContinuousBenchmark::run()
 {
-    // a RU and BU will exist on every rank
-
-    // init a circular vector of indexes for the BUs
-
-    // for every RU (in order) perform communication and measure what is to be measured
-
     int buRank;
     timespec startTime, endTime;
     std::size_t errorMessageCount = -1;

@@ -67,33 +67,32 @@ void Benchmark::allocateMemory()
     m_memRcvPtr = buffer_t(memRcv, free);
 }
 
-void Benchmark::warmupCommunication(std::vector<std::pair<int, int>> subarrayIndices, int8_t rank)
+void Benchmark::warmupCommunication(std::vector<std::pair<int, int>> subarrayIndices, ReadoutUnit *ru, BuilderUnit *bu,
+                                    int ruRank, int buRank, int processRank)
 {
     std::size_t subarrayCount = subarrayIndices.size();
     std::size_t subarraySize;
 
-    if (rank == 0)
-        std::cout << "Performing warmup...";
-
-    if (rank == 0)
+    if (m_rank == ruRank)
     {
-        for (int i = 0; i < subarrayCount; i++)
+        int8_t *bufferSnd = ru->getBuffer();
+
+        for (std::size_t i = 0; i < subarrayCount; i++)
         {
             subarraySize = subarrayIndices[i].second - subarrayIndices[i].first + 1;
-            MPI_Send(m_bufferSnd + subarrayIndices[i].first, subarraySize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
+            MPI_Send(bufferSnd + subarrayIndices[i].first, subarraySize, MPI_BYTE, ruRank, 0, MPI_COMM_WORLD);
         }
     }
-    else if (rank == 1)
+    else if (m_rank == buRank)
     {
-        for (int i = 0; i < subarrayCount; i++)
+        int8_t *bufferRcv = bu->getBuffer();
+
+        for (std::size_t i = 0; i < subarrayCount; i++)
         {
             subarraySize = subarrayIndices[i].second - subarrayIndices[i].first + 1;
-            MPI_Recv(m_bufferRcv + subarrayIndices[i].first, subarraySize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            MPI_Recv(bufferRcv + subarrayIndices[i].first, subarraySize, MPI_BYTE, buRank, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         }
     }
-
-    if (rank == 0)
-        std::cout << "Done." << std::endl;
 }
 
 void Benchmark::performWarmup()
@@ -101,17 +100,20 @@ void Benchmark::performWarmup()
     int buRank;
     timespec startTime, endTime;
     double throughput;
-    std::size_t messageSize = m_sndBufferBytes / 10;
+    const std::size_t bufferBytes = m_readoutUnit->getBufferBytes();
+    std::size_t messageSize = bufferBytes / 10;
     std::size_t transferredSize = 0;
 
-    std::vector<std::pair<int, int>> subarrayIndices = findSubarrayIndices(m_sndBufferBytes);
+    std::vector<std::pair<int, int>> subarrayIndices = findSubarrayIndices(bufferBytes);
 
     clock_gettime(CLOCK_MONOTONIC, &startTime);
+
     for (int ruRank = 0; ruRank < m_nodesCount; ruRank++)
     {
+        buRank = (1 + ruRank) % m_nodesCount;
         if (m_rank == ruRank || m_rank == buRank)
         {
-            std::pair<std::size_t, std::size_t> result = CommunicationInterface::unitsBlockingCommunication(m_readoutUnit.get(), m_builderUnit.get(), ruRank, ruRank, m_rank,
+            std::pair<std::size_t, std::size_t> result = CommunicationInterface::unitsBlockingCommunication(m_readoutUnit.get(), m_builderUnit.get(), ruRank, buRank, m_rank,
                                                                                                             messageSize, m_warmupIterations);
             transferredSize += result.second;
         }
@@ -121,18 +123,29 @@ void Benchmark::performWarmup()
     std::tie(std::ignore, throughput) = calculateThroughput(startTime, endTime, transferredSize, m_warmupIterations);
 
     if (m_rank == 0)
-        std::cout << "\nAvg. pre-warmup throughput: " << throughput << " Mbit/s" << std::endl;
+        std::cout << "\nAvg. pre-warmup throughput: " << throughput << " Mbit/s" << std::endl
+                  << "Performing warmup...";
 
-    warmupCommunication(subarrayIndices, m_rank);
+    for (int ruRank = 0; ruRank < m_nodesCount; ruRank++)
+    {
+        buRank = (1 + ruRank) % m_nodesCount;
+        if (m_rank == ruRank || m_rank == buRank)
+            warmupCommunication(subarrayIndices, m_readoutUnit.get(), m_builderUnit.get(), ruRank, buRank, m_rank);
+    }
+
+    if (m_rank == 0)
+        std::cout << "Done." << std::endl;
 
     transferredSize = 0;
     clock_gettime(CLOCK_MONOTONIC, &startTime);
 
     for (int ruRank = 0; ruRank < m_nodesCount; ruRank++)
     {
+        buRank = (1 + ruRank) % m_nodesCount;
         if (m_rank == ruRank || m_rank == buRank)
         {
-            std::pair<std::size_t, std::size_t> result = CommunicationInterface::unitsBlockingCommunication(m_readoutUnit.get(), m_builderUnit.get(), ruRank, ruRank, m_rank,
+            std::cout << m_rank << std::endl;
+            std::pair<std::size_t, std::size_t> result = CommunicationInterface::unitsBlockingCommunication(m_readoutUnit.get(), m_builderUnit.get(), ruRank, buRank, m_rank,
                                                                                                             messageSize, m_warmupIterations);
             transferredSize += result.second;
         }

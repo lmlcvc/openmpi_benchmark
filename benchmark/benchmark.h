@@ -56,10 +56,11 @@ protected:
     void allocateMemory();
     virtual void parseArguments(std::vector<ArgumentEntry> args) = 0;
 
-    virtual void warmupCommunication(std::vector<std::pair<int, int>> subarrayIndices, int8_t rank);
+    virtual void warmupCommunication(std::vector<std::pair<int, int>> subarrayIndices, ReadoutUnit *ru, BuilderUnit *bu,
+                                     int ruRank, int buRank, int processRank);
 
     int m_rank;
-    int m_nodesCount;
+    int m_nodesCount = 4; // TODO: parametrise
     std::size_t m_currentPhase = 0;
 
     std::size_t m_iterations = 1e5;       // communication steps to be printed
