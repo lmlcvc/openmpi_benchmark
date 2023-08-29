@@ -2,6 +2,17 @@
 
 ScanBenchmark::ScanBenchmark(std::vector<ArgumentEntry> args, int rank)
 {
+    int size;
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    if (size != 2)
+    {
+        if (rank == 0)
+            std::cerr << "Scan benchmark requires exactly 2 processes. Exiting." << std::endl;
+        MPI_Finalize();
+        std::exit(1);
+    }
+
     m_rank = rank;
     parseArguments(args);
 
@@ -9,6 +20,29 @@ ScanBenchmark::ScanBenchmark(std::vector<ArgumentEntry> args, int rank)
     m_rcvBufferBytes = m_rcvBufferSize * static_cast<std::size_t>(std::pow(2, m_maxPower));
 
     allocateMemory();
+}
+
+void ScanBenchmark::allocateMemory()
+{
+    const long pageSize = sysconf(_SC_PAGESIZE);
+
+    void *memSnd = nullptr;
+    void *memRcv = nullptr;
+
+    if (posix_memalign(&memSnd, pageSize, m_sndBufferBytes) != 0 || posix_memalign(&memRcv, pageSize, m_rcvBufferBytes) != 0)
+    {
+        std::cerr << "Memory allocation failed" << std::endl;
+        MPI_Finalize();
+        std::exit(1);
+    }
+
+    m_bufferSnd = static_cast<int8_t *>(memSnd);
+    std::fill(m_bufferSnd, m_bufferSnd + m_sndBufferBytes, 0);
+
+    m_bufferRcv = static_cast<int8_t *>(memRcv);
+
+    m_memSndPtr = buffer_t(memSnd, free);
+    m_memRcvPtr = buffer_t(memRcv, free);
 }
 
 void ScanBenchmark::parseArguments(std::vector<ArgumentEntry> args)
@@ -99,4 +133,3 @@ void ScanBenchmark::run()
         std::cout << "\nNumber of non-MPI_SUCCESS statuses: " << errorMessageCount << "\n"
                   << std::endl;
 }
-

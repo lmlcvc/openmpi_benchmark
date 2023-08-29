@@ -44,29 +44,6 @@ std::pair<double, double> Benchmark::calculateThroughput(timespec startTime, tim
     return std::make_pair(avgRtt, avgThroughput);
 }
 
-void Benchmark::allocateMemory()
-{
-    const long pageSize = sysconf(_SC_PAGESIZE);
-
-    void *memSnd = nullptr;
-    void *memRcv = nullptr;
-
-    if (posix_memalign(&memSnd, pageSize, m_sndBufferBytes) != 0 || posix_memalign(&memRcv, pageSize, m_rcvBufferBytes) != 0)
-    {
-        std::cerr << "Memory allocation failed" << std::endl;
-        MPI_Finalize();
-        std::exit(1);
-    }
-
-    m_bufferSnd = static_cast<int8_t *>(memSnd);
-    std::fill(m_bufferSnd, m_bufferSnd + m_sndBufferBytes, 0);
-
-    m_bufferRcv = static_cast<int8_t *>(memRcv);
-
-    m_memSndPtr = buffer_t(memSnd, free);
-    m_memRcvPtr = buffer_t(memRcv, free);
-}
-
 void Benchmark::warmupCommunication(std::vector<std::pair<int, int>> subarrayIndices, ReadoutUnit *ru, BuilderUnit *bu,
                                     int ruRank, int buRank, int processRank)
 {

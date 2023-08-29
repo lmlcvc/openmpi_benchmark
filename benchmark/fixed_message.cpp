@@ -9,9 +9,10 @@ BenchmarkFixedMessage::BenchmarkFixedMessage(std::vector<ArgumentEntry> args, in
 
     parseArguments(args);
 
-    allocateMemory();
+    m_readoutUnit = std::make_unique<ReadoutUnit>(rank);
+    m_builderUnit = std::make_unique<BuilderUnit>(rank);
 
-    if (m_rank == 0 && m_messageSize > m_sndBufferBytes)
+    if (m_rank == 0 && m_messageSize > m_readoutUnit->getBufferBytes())
     {
         std::cerr << "Message cannot exceed buffer. Exiting." << std::endl;
         MPI_Finalize();
@@ -28,17 +29,14 @@ BenchmarkFixedMessage::BenchmarkFixedMessage(std::vector<ArgumentEntry> args, in
                   << std::right << std::setw(10) << m_messageSize << " B" << std::endl;
 
         std::cout << std::left << std::setw(20) << "Send buffer size:"
-                  << std::right << std::setw(10) << m_sndBufferBytes << " B" << std::endl;
+                  << std::right << std::setw(10) << m_readoutUnit->getBufferBytes() << " B" << std::endl;
 
         std::cout << std::left << std::setw(20) << "Receive buffer size:"
-                  << std::right << std::setw(10) << m_rcvBufferBytes << " B" << std::endl;
+                  << std::right << std::setw(10) << m_builderUnit->getBufferBytes() << " B" << std::endl;
 
         std::cout << std::left << std::setw(20) << "Number of iterations:"
                   << std::right << std::setw(9) << m_iterations << std::endl;
     }
-
-    m_readoutUnit = std::make_unique<ReadoutUnit>(rank);
-    m_builderUnit = std::make_unique<BuilderUnit>(rank);
 }
 
 void BenchmarkFixedMessage::parseArguments(std::vector<ArgumentEntry> args)
@@ -50,11 +48,11 @@ void BenchmarkFixedMessage::parseArguments(std::vector<ArgumentEntry> args)
         {
         case 'b':
             tmp = std::stoul(entry.value);
-            m_sndBufferBytes = (tmp > 0) ? tmp : m_sndBufferBytes;
+            // TODO: send to readout unit
             break;
         case 'r':
             tmp = std::stoul(entry.value);
-            m_rcvBufferBytes = (tmp > 0) ? tmp : m_rcvBufferBytes;
+            // TODO: send to builder unit
             break;
         case 'm':
             tmp = std::stoul(entry.value);

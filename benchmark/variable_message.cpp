@@ -7,22 +7,23 @@ BenchmarkVariableMessage::BenchmarkVariableMessage(std::vector<ArgumentEntry> ar
 
     parseArguments(args);
 
-    initMessageSizes();
+    m_readoutUnit = std::make_unique<ReadoutUnit>(rank);
+    m_builderUnit = std::make_unique<BuilderUnit>(rank);
 
-    allocateMemory();
+    initMessageSizes();
 
     if (m_rank == 0)
     {
         std::cout << std::endl
                   << "Performing variable size benchmark." << std::endl
-                  << "Available sizes: " << m_messageSizeVariants << " (range: 10000 B - " << m_sndBufferBytes << " B)" << std::endl;
+                  << "Available sizes: " << m_messageSizeVariants << " (range: 10000 B - " << m_readoutUnit->getBufferBytes() << " B)" << std::endl;
 
         std::cout << std::endl
                   << std::left << std::setw(20) << "Send buffer size:"
-                  << std::right << std::setw(10) << m_sndBufferBytes << " B" << std::endl;
+                  << std::right << std::setw(10) << m_readoutUnit->getBufferBytes() << " B" << std::endl;
 
         std::cout << std::left << std::setw(20) << "Receive buffer size:"
-                  << std::right << std::setw(10) << m_rcvBufferBytes << " B" << std::endl;
+                  << std::right << std::setw(10) << m_builderUnit->getBufferBytes() << " B" << std::endl;
 
         std::cout << std::left << std::setw(20) << "Number of iterations:"
                   << std::right << std::setw(9) << m_iterations << std::endl;
@@ -38,11 +39,11 @@ void BenchmarkVariableMessage::parseArguments(std::vector<ArgumentEntry> args)
         {
         case 'b':
             tmp = std::stoul(entry.value);
-            m_sndBufferBytes = (tmp > 0) ? tmp : m_sndBufferBytes;
+            // TODO: send to readout unit
             break;
         case 'r':
             tmp = std::stoul(entry.value);
-            m_rcvBufferBytes = (tmp > 0) ? tmp : m_rcvBufferBytes;
+            // TODO: send to builder unit
             break;
         case 'm':
             tmp = std::stoul(entry.value);
@@ -73,7 +74,7 @@ void BenchmarkVariableMessage::initMessageSizes()
     std::mt19937 generator(seed);
 
     std::size_t lowerBound = 1e4;
-    std::size_t upperBound = m_sndBufferBytes;
+    std::size_t upperBound = m_readoutUnit->getBufferBytes();
 
     if (upperBound < lowerBound)
     {
@@ -96,8 +97,6 @@ void BenchmarkVariableMessage::initMessageSizes()
 void BenchmarkVariableMessage::printIterationInfo(timespec startTime, timespec endTime, int ruRank, int buRank,
                                                   std::size_t transferredSize, std::size_t errorMessagesCount)
 {
-    // TODO: modify to include RU and BU
-
     timespec elapsedTime = diff(startTime, endTime);
     double elapsedSecs = elapsedTime.tv_sec + (elapsedTime.tv_nsec / 1e9);
 

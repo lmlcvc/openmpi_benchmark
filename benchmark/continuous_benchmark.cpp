@@ -25,26 +25,30 @@ void ContinuousBenchmark::run()
             }
             else if (m_commType == COMM_FIXED_NONBLOCKING)
             {
-                std::pair<std::size_t, std::size_t> result = CommunicationInterface::nonBlockingCommunication(m_bufferSnd, m_bufferRcv, m_sndBufferBytes, m_rcvBufferBytes,
-                                                                                                              m_messageSize, m_rank, m_iterations, m_syncIterations);
+                std::pair<std::size_t, std::size_t> result = CommunicationInterface::unitsNonBlockingCommunication(m_readoutUnit.get(), m_builderUnit.get(), ruRank, buRank, m_rank,
+                                                                                                                m_messageSize, m_iterations, m_syncIterations);
+
+
+                //std::pair<std::size_t, std::size_t> result = CommunicationInterface::nonBlockingCommunication(m_bufferSnd, m_bufferRcv, m_sndBufferBytes, m_rcvBufferBytes,
+                //                                                                                              m_messageSize, m_rank, m_iterations, m_syncIterations);
                 errorMessageCount = result.first;
                 transferredSize = result.second;
             }
             else if (m_commType == COMM_VARIABLE_BLOCKING)
             {
-                std::pair<std::size_t, std::size_t> result = CommunicationInterface::variableBlockingCommunication(m_bufferSnd, m_bufferRcv,
+                /*std::pair<std::size_t, std::size_t> result = CommunicationInterface::variableBlockingCommunication(m_bufferSnd, m_bufferRcv,
                                                                                                                    m_sndBufferBytes, m_rcvBufferBytes,
                                                                                                                    m_messageSizes, m_rank, m_iterations);
                 errorMessageCount = result.first;
-                transferredSize = result.second;
+                transferredSize = result.second;*/
             }
 
             else if (m_commType == COMM_VARIABLE_NONBLOCKING)
             {
-                std::pair<std::size_t, std::size_t> result = CommunicationInterface::blockingCommunication(m_bufferSnd, m_bufferRcv, m_sndBufferBytes, m_rcvBufferBytes,
+                /*std::pair<std::size_t, std::size_t> result = CommunicationInterface::blockingCommunication(m_bufferSnd, m_bufferRcv, m_sndBufferBytes, m_rcvBufferBytes,
                                                                                                            m_messageSize, m_rank, m_iterations);
                 errorMessageCount = result.first;
-                transferredSize = result.second;
+                transferredSize = result.second;*/
             }
 
             clock_gettime(CLOCK_MONOTONIC, &endTime);
@@ -53,6 +57,6 @@ void ContinuousBenchmark::run()
                 printIterationInfo(startTime, endTime, ruRank, buRank, transferredSize, errorMessageCount);
         }
     }
-    m_currentPhase = (m_currentPhase + 1) % m_nodesCount;
-    // TODO: implement phase syncing
+    m_currentPhase++;
+    MPI_Barrier(MPI_COMM_WORLD);
 }

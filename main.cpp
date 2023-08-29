@@ -14,6 +14,13 @@
 
 volatile sig_atomic_t sigintReceived = 0;
 
+// TODO: run arguments (define and adapt code)
+// FRAG_SIZE
+// CHUNK_SIZE - if none, do not split message ( = FRAG_SIZE )
+
+// TODO: adapt fixed non-blocking benchmark to units
+// After that, follow same logic for variable communication.
+
 void handleSignals(int signal)
 {
     if (signal == SIGINT)
@@ -170,9 +177,6 @@ int main(int argc, char **argv)
 
     MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
 
-    // Run setup
-    std::cout << "Initialised rank " << rank << std::endl;
-
     // Benchmark object initialisation
     parseArguments(argc, argv, rank, commType, commArguments);
     if (commType == COMM_SCAN)
@@ -202,7 +206,7 @@ int main(int argc, char **argv)
 
     // Run program
     clock_gettime(CLOCK_MONOTONIC, &runStartTime);
-    benchmark->performWarmup();
+    // benchmark->performWarmup(); // FIXME: warmup hangs
     do
     {
         benchmark->run();
