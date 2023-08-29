@@ -47,16 +47,16 @@ void printHelp()
     std::cout << "    -f                      Perform a run with a fixed message size.\n";
     std::cout << "    -m <message size>        Set the fixed message size.\n";
     std::cout << "    -i <iterations>          Specify the number of iterations.\n";
-    std::cout << "    -b <send buffer bytes>   Set the size of the send buffer in bytes.\n";
-    std::cout << "    -r <receive buffer bytes> Set the size of the receive buffer in bytes.\n";
+    std::cout << "    -r <RU buffer bytes>   Set the size of the send buffer in bytes.\n";
+    std::cout << "    -b <BU buffer bytes> Set the size of the receive buffer in bytes.\n";
     std::cout << "    -w <warmup iterations>   Set the number of warmup iterations.\n\n";
 
     std::cout << "  VARIABLE MESSAGE SIZE RUN:\n";
     std::cout << "    -v                      Perform a run with variable message sizes.\n";
     std::cout << "    -m <message size variants> Set the number of message size variants.\n";
     std::cout << "    -i <iterations>          Specify the number of iterations.\n";
-    std::cout << "    -b <send buffer bytes>   Set the size of the send buffer in bytes.\n";
-    std::cout << "    -r <receive buffer bytes> Set the size of the receive buffer in bytes.\n";
+    std::cout << "    -r <RU buffer bytes>   Set the size of the send buffer in bytes.\n";
+    std::cout << "    -b <BU buffer bytes> Set the size of the receive buffer in bytes.\n";
     std::cout << "    -w <warmup iterations>   Set the number of warmup iterations.\n";
 }
 
@@ -191,7 +191,7 @@ int main(int argc, char **argv)
 
     else if (commType == COMM_VARIABLE_BLOCKING || commType == COMM_VARIABLE_NONBLOCKING)
     {
-        benchmark = std::make_unique<BenchmarkVariableMessage>(commArguments, rank, commType);
+        benchmark = std::make_unique<BenchmarkVariableMessage>(commArguments, rank, size, commType);
     }
     else
     {

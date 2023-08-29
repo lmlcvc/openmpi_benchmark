@@ -4,5 +4,5 @@ ReadoutUnit::ReadoutUnit(int rank)
 {
     m_rank = rank;
 
-    allocateMemory();
+    //allocateMemory();
 }

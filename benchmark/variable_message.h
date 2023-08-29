@@ -8,7 +8,7 @@
 class BenchmarkVariableMessage : public ContinuousBenchmark
 {
 public:
-    BenchmarkVariableMessage(std::vector<ArgumentEntry> args, int rank, CommunicationType commType);
+    BenchmarkVariableMessage(std::vector<ArgumentEntry> args, int rank, int size, CommunicationType commType);
     virtual ~BenchmarkVariableMessage() override {}
 
 private:

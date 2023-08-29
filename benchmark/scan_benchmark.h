@@ -21,7 +21,6 @@ private:
     std::size_t m_sndBufferSize = 10; // circular buffer sizes (in messages)
     std::size_t m_rcvBufferSize = 10;
 
-    // TODO: move to scan benchmark
     buffer_t m_memSndPtr;
     buffer_t m_memRcvPtr;
 

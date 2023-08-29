@@ -17,7 +17,7 @@ protected:
     std::vector<std::size_t> m_messageSizes;
 
     const std::size_t minMessageSize = 1e4;
-    std::size_t m_syncIterations = 1e4; // TODO: calculate or parametrise
+    std::size_t m_syncIterations;
 };
 
 #endif // CONTINUOUSBENCHMARK_H

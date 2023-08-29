@@ -1,14 +1,20 @@
 #include "variable_message.h"
 
-BenchmarkVariableMessage::BenchmarkVariableMessage(std::vector<ArgumentEntry> args, int rank, CommunicationType commType)
+BenchmarkVariableMessage::BenchmarkVariableMessage(std::vector<ArgumentEntry> args, int rank, int size, CommunicationType commType)
 {
     m_rank = rank;
+    m_nodesCount = size;
     m_commType = commType;
-
-    parseArguments(args);
 
     m_readoutUnit = std::make_unique<ReadoutUnit>(rank);
     m_builderUnit = std::make_unique<BuilderUnit>(rank);
+
+    parseArguments(args);
+
+    m_syncIterations = m_iterations / 1e4;
+
+    m_readoutUnit->allocateMemory();
+    m_builderUnit->allocateMemory();
 
     initMessageSizes();
 
@@ -19,10 +25,10 @@ BenchmarkVariableMessage::BenchmarkVariableMessage(std::vector<ArgumentEntry> ar
                   << "Available sizes: " << m_messageSizeVariants << " (range: 10000 B - " << m_readoutUnit->getBufferBytes() << " B)" << std::endl;
 
         std::cout << std::endl
-                  << std::left << std::setw(20) << "Send buffer size:"
+                  << std::left << std::setw(20) << "RU buffer size:"
                   << std::right << std::setw(10) << m_readoutUnit->getBufferBytes() << " B" << std::endl;
 
-        std::cout << std::left << std::setw(20) << "Receive buffer size:"
+        std::cout << std::left << std::setw(20) << "BU buffer size:"
                   << std::right << std::setw(10) << m_builderUnit->getBufferBytes() << " B" << std::endl;
 
         std::cout << std::left << std::setw(20) << "Number of iterations:"
@@ -37,13 +43,15 @@ void BenchmarkVariableMessage::parseArguments(std::vector<ArgumentEntry> args)
     {
         switch (entry.option)
         {
-        case 'b':
-            tmp = std::stoul(entry.value);
-            // TODO: send to readout unit
-            break;
         case 'r':
             tmp = std::stoul(entry.value);
-            // TODO: send to builder unit
+            if (tmp > 0)
+                m_readoutUnit->setBufferBytes(tmp);
+            break;
+        case 'b':
+            tmp = std::stoul(entry.value);
+            if (tmp > 0)
+                m_builderUnit->setBufferBytes(tmp);
             break;
         case 'm':
             tmp = std::stoul(entry.value);

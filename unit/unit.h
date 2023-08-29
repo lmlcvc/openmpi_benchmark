@@ -16,14 +16,16 @@ class Unit
 {
 public:
     ~Unit() {}
+    void allocateMemory();
 
     const int getRank() { return m_rank; }
+
     const std::size_t getBufferBytes() const { return m_bufferBytes; }
+    void setBufferBytes(std::size_t bytes) { m_bufferBytes = bytes; }
+
     int8_t *getBuffer() const { return m_buffer; }
 
 protected:
-    void allocateMemory();
-
     int m_rank;
 
     typedef std::unique_ptr<void, std::function<void(void *)>> buffer_t;

@@ -7,10 +7,15 @@ BenchmarkFixedMessage::BenchmarkFixedMessage(std::vector<ArgumentEntry> args, in
     m_commType = commType;
     m_messageSize = 1e5;
 
-    parseArguments(args);
-
     m_readoutUnit = std::make_unique<ReadoutUnit>(rank);
     m_builderUnit = std::make_unique<BuilderUnit>(rank);
+
+    parseArguments(args);
+
+    m_syncIterations = m_iterations / 1e4;
+
+    m_readoutUnit->allocateMemory();
+    m_builderUnit->allocateMemory();
 
     if (m_rank == 0 && m_messageSize > m_readoutUnit->getBufferBytes())
     {
@@ -28,10 +33,10 @@ BenchmarkFixedMessage::BenchmarkFixedMessage(std::vector<ArgumentEntry> args, in
         std::cout << std::left << std::setw(20) << "Message size:"
                   << std::right << std::setw(10) << m_messageSize << " B" << std::endl;
 
-        std::cout << std::left << std::setw(20) << "Send buffer size:"
+        std::cout << std::left << std::setw(20) << "RU buffer size:"
                   << std::right << std::setw(10) << m_readoutUnit->getBufferBytes() << " B" << std::endl;
 
-        std::cout << std::left << std::setw(20) << "Receive buffer size:"
+        std::cout << std::left << std::setw(20) << "BU buffer size:"
                   << std::right << std::setw(10) << m_builderUnit->getBufferBytes() << " B" << std::endl;
 
         std::cout << std::left << std::setw(20) << "Number of iterations:"
@@ -46,13 +51,15 @@ void BenchmarkFixedMessage::parseArguments(std::vector<ArgumentEntry> args)
     {
         switch (entry.option)
         {
-        case 'b':
-            tmp = std::stoul(entry.value);
-            // TODO: send to readout unit
-            break;
         case 'r':
             tmp = std::stoul(entry.value);
-            // TODO: send to builder unit
+            if (tmp > 0)
+                m_readoutUnit->setBufferBytes(tmp);
+            break;
+        case 'b':
+            tmp = std::stoul(entry.value);
+            if (tmp > 0)
+                m_builderUnit->setBufferBytes(tmp);
             break;
         case 'm':
             tmp = std::stoul(entry.value);

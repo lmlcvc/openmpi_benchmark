@@ -59,7 +59,7 @@ protected:
                                      int ruRank, int buRank, int processRank);
 
     int m_rank;
-    int m_nodesCount = 4; // TODO: parametrise
+    int m_nodesCount;
     std::size_t m_currentPhase = 0;
 
     std::size_t m_iterations = 1e5;       // communication steps to be printed
