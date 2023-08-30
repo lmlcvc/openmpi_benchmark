@@ -7,22 +7,21 @@ BenchmarkFixedMessage::BenchmarkFixedMessage(std::vector<ArgumentEntry> args, in
     m_commType = commType;
     m_messageSize = 1e5;
 
-    m_readoutUnit = std::make_unique<ReadoutUnit>(rank);
-    m_builderUnit = std::make_unique<BuilderUnit>(rank);
+    m_unit = std::make_unique<Unit>(rank);
 
     parseArguments(args);
 
-    m_syncIterations = m_iterations / 1e4;
-
-    m_readoutUnit->allocateMemory();
-    m_builderUnit->allocateMemory();
-
-    if (m_rank == 0 && m_messageSize > m_readoutUnit->getBufferBytes())
+    if (m_rank == 0 && m_messageSize > m_ruBufferBytes)
     {
         std::cerr << "Message cannot exceed buffer. Exiting." << std::endl;
         MPI_Finalize();
         std::exit(1);
     }
+
+    initUnitLists();
+    m_unit->allocateMemory();
+
+    m_syncIterations = m_iterations / 1e4;
 
     if (m_rank == 0)
     {
@@ -34,10 +33,10 @@ BenchmarkFixedMessage::BenchmarkFixedMessage(std::vector<ArgumentEntry> args, in
                   << std::right << std::setw(10) << m_messageSize << " B" << std::endl;
 
         std::cout << std::left << std::setw(20) << "RU buffer size:"
-                  << std::right << std::setw(10) << m_readoutUnit->getBufferBytes() << " B" << std::endl;
+                  << std::right << std::setw(10) << m_ruBufferBytes << " B" << std::endl;
 
-        std::cout << std::left << std::setw(20) << "BU buffer size:"
-                  << std::right << std::setw(10) << m_builderUnit->getBufferBytes() << " B" << std::endl;
+        std::cout << std::left << std::setw(20) << "RU buffer size:"
+                  << std::right << std::setw(10) << m_buBufferBytes << " B" << std::endl;
 
         std::cout << std::left << std::setw(20) << "Number of iterations:"
                   << std::right << std::setw(9) << m_iterations << std::endl;
@@ -54,12 +53,12 @@ void BenchmarkFixedMessage::parseArguments(std::vector<ArgumentEntry> args)
         case 'r':
             tmp = std::stoul(entry.value);
             if (tmp > 0)
-                m_readoutUnit->setBufferBytes(tmp);
+                m_ruBufferBytes = tmp;
             break;
         case 'b':
             tmp = std::stoul(entry.value);
             if (tmp > 0)
-                m_builderUnit->setBufferBytes(tmp);
+                m_buBufferBytes = tmp;
             break;
         case 'm':
             tmp = std::stoul(entry.value);
@@ -84,7 +83,7 @@ void BenchmarkFixedMessage::parseArguments(std::vector<ArgumentEntry> args)
     }
 }
 
-void BenchmarkFixedMessage::printIterationInfo(timespec startTime, timespec endTime, int ruRank, int buRank,
+void BenchmarkFixedMessage::printIterationInfo(timespec startTime, timespec endTime, std::string ruId, std::string buId,
                                                std::size_t transferredSize, std::size_t errorMessagesCount)
 {
     timespec elapsedTime = diff(startTime, endTime);
@@ -104,8 +103,8 @@ void BenchmarkFixedMessage::printIterationInfo(timespec startTime, timespec endT
               << std::endl;
 
     std::cout << std::right << std::setw(7) << m_currentPhase
-              << " | " << std::setw(7) << ruRank
-              << " | " << std::setw(7) << buRank
+              << " | " << std::setw(7) << ruId
+              << " | " << std::setw(7) << buId      // FIXME: not printing
               << " | " << std::setw(12) << avgRtt << " s"
               << " | " << std::setw(11) << std::fixed << std::setprecision(2) << avgThroughput << " Mbit/s"
               << " | " << std::setw(10) << errorMessagesCount << std::endl

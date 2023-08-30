@@ -11,6 +11,10 @@ public:
 
     void run() override;
 
+    // TODO: implement scan warmup
+    void performWarmup() override {}
+    void warmupCommunication(std::vector<std::pair<int, int>> subarrayIndices, int ruRank, int buRank) override {}
+
 private:
     void allocateMemory();
     void parseArguments(std::vector<ArgumentEntry> args) override;

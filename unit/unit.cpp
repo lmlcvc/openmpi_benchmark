@@ -1,5 +1,9 @@
 #include "unit.h"
 
+Unit::Unit(int rank) {
+    m_rank = rank;
+}
+
 void Unit::allocateMemory()
 {
     const long pageSize = sysconf(_SC_PAGESIZE);

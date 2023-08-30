@@ -21,6 +21,10 @@ volatile sig_atomic_t sigintReceived = 0;
 // TODO: adapt fixed non-blocking benchmark to units
 // After that, follow same logic for variable communication.
 
+// FIXME: rank logic
+// Each unit should have its own rank
+// A unit ID can be the same between a RU and a BU, but they will be a different rank
+
 void handleSignals(int signal)
 {
     if (signal == SIGINT)
@@ -39,7 +43,7 @@ void printHelp()
     std::cout << "    -s                      Perform a scan run with varied message sizes.\n";
     std::cout << "    -p <max power>           Set the maximum power of 2 for message sizes.\n";
     std::cout << "    -i <iterations>          Specify the number of iterations.\n";
-    std::cout << "    -b <send buffer size>   Set the size of the send buffer in messages.\n";
+    std::cout << "    -b <send buffer size>    Set the size of the send buffer in messages.\n";
     std::cout << "    -r <receive buffer size> Set the size of the receive buffer in messages.\n";
     std::cout << "    -w <warmup iterations>   Set the number of warmup iterations.\n\n";
 
@@ -47,17 +51,17 @@ void printHelp()
     std::cout << "    -f                      Perform a run with a fixed message size.\n";
     std::cout << "    -m <message size>        Set the fixed message size.\n";
     std::cout << "    -i <iterations>          Specify the number of iterations.\n";
-    std::cout << "    -r <RU buffer bytes>   Set the size of the send buffer in bytes.\n";
-    std::cout << "    -b <BU buffer bytes> Set the size of the receive buffer in bytes.\n";
+    std::cout << "    -r <RU buffer bytes>     Set the size of the send buffer in bytes.\n";
+    std::cout << "    -b <BU buffer bytes>     Set the size of the receive buffer in bytes.\n";
     std::cout << "    -w <warmup iterations>   Set the number of warmup iterations.\n\n";
 
     std::cout << "  VARIABLE MESSAGE SIZE RUN:\n";
-    std::cout << "    -v                      Perform a run with variable message sizes.\n";
+    std::cout << "    -v                         Perform a run with variable message sizes.\n";
     std::cout << "    -m <message size variants> Set the number of message size variants.\n";
-    std::cout << "    -i <iterations>          Specify the number of iterations.\n";
-    std::cout << "    -r <RU buffer bytes>   Set the size of the send buffer in bytes.\n";
-    std::cout << "    -b <BU buffer bytes> Set the size of the receive buffer in bytes.\n";
-    std::cout << "    -w <warmup iterations>   Set the number of warmup iterations.\n";
+    std::cout << "    -i <iterations>            Specify the number of iterations.\n";
+    std::cout << "    -r <RU buffer bytes>       Set the size of the send buffer in bytes.\n";
+    std::cout << "    -b <BU buffer bytes>       Set the size of the receive buffer in bytes.\n";
+    std::cout << "    -w <warmup iterations>     Set the number of warmup iterations.\n";
 }
 
 timespec diff(timespec start, timespec end)
@@ -206,7 +210,8 @@ int main(int argc, char **argv)
 
     // Run program
     clock_gettime(CLOCK_MONOTONIC, &runStartTime);
-    // benchmark->performWarmup(); // FIXME: warmup hangs
+    // TODO: adapt warmup to new logic
+    // benchmark->performWarmup();
     do
     {
         benchmark->run();

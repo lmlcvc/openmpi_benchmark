@@ -19,10 +19,10 @@
 #include <cstring>
 #include <algorithm>
 #include <functional>
+#include <string>
 
 #include "../communication/communication_interface.h"
-#include "../unit/readout_unit.h"
-#include "../unit/builder_unit.h"
+#include "../unit/unit.h"
 
 struct ArgumentEntry
 {
@@ -46,21 +46,16 @@ public:
     virtual ~Benchmark() {}
     virtual void run() = 0;
 
-    void performWarmup();
-
 protected:
     timespec diff(timespec start, timespec end);
     std::vector<std::pair<int, int>> findSubarrayIndices(std::size_t messageSize);
     std::pair<double, double> calculateThroughput(timespec startTime, timespec endTime, std::size_t bytesTransferred, std::size_t iterations);
 
+    virtual void performWarmup() = 0;
+    virtual void warmupCommunication(std::vector<std::pair<int, int>> subarrayIndices, int ruRank, int buRank) = 0;
     virtual void parseArguments(std::vector<ArgumentEntry> args) = 0;
 
-    virtual void warmupCommunication(std::vector<std::pair<int, int>> subarrayIndices, ReadoutUnit *ru, BuilderUnit *bu,
-                                     int ruRank, int buRank, int processRank);
-
     int m_rank;
-    int m_nodesCount;
-    std::size_t m_currentPhase = 0;
 
     std::size_t m_iterations = 1e5;       // communication steps to be printed
     std::size_t m_warmupIterations = 100; // iteration count for warmup-related throughput calculation
@@ -69,9 +64,6 @@ protected:
     const std::size_t m_minIterations = 1e5;
 
     typedef std::unique_ptr<void, std::function<void(void *)>> buffer_t;
-
-    std::unique_ptr<ReadoutUnit> m_readoutUnit;
-    std::unique_ptr<BuilderUnit> m_builderUnit;
 };
 
 #endif // BENCHMARK_H

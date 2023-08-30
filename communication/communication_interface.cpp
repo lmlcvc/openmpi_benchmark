@@ -45,7 +45,7 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::blockingCommunicatio
     return std::make_pair(errorMessageCount, transferredSize);
 }
 
-std::pair<std::size_t, std::size_t> CommunicationInterface::unitsBlockingCommunication(ReadoutUnit *ru, BuilderUnit *bu, int ruRank, int buRank, int processRank,
+std::pair<std::size_t, std::size_t> CommunicationInterface::unitsBlockingCommunication(Unit *unit, int ruRank, int buRank, int processRank,
                                                                                        std::size_t messageSize, std::size_t iterations)
 {
 
@@ -56,9 +56,11 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::unitsBlockingCommuni
 
     if (processRank == ruRank)
     {
-        int8_t *bufferSnd = ru->getBuffer();
-        const std::size_t sndBufferBytes = ru->getBufferBytes();
+        int8_t *bufferSnd = unit->getBuffer();
+        const std::size_t sndBufferBytes = unit->getBufferBytes();
         std::size_t sendOffset = 0;
+
+        std::cout << "Sending from " << ruRank << " to " << buRank << std::endl;
 
         for (std::size_t i = 0; i < iterations; i++)
         {
@@ -72,8 +74,8 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::unitsBlockingCommuni
     }
     else if (processRank == buRank)
     {
-        int8_t *bufferRcv = bu->getBuffer();
-        const std::size_t rcvBufferBytes = bu->getBufferBytes();
+        int8_t *bufferRcv = unit->getBuffer();
+        const std::size_t rcvBufferBytes = unit->getBufferBytes();
         std::size_t recvOffset = 0;
 
         for (std::size_t i = 0; i < iterations; i++)
@@ -97,6 +99,7 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::unitsBlockingCommuni
     return std::make_pair(errorMessageCount, transferredSize);
 }
 
+/*
 // XXX: low throughput
 std::pair<std::size_t, std::size_t> CommunicationInterface::nonBlockingCommunication(int8_t *bufferSnd, int8_t *bufferRcv,
                                                                                      std::size_t sndBufferBytes, std::size_t rcvBufferBytes,
@@ -147,7 +150,6 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::nonBlockingCommunica
     return std::make_pair(errorMessageCount, transferredSize);
 }
 
-// FIXME: hanging
 std::pair<std::size_t, std::size_t> CommunicationInterface::unitsNonBlockingCommunication(ReadoutUnit *ru, BuilderUnit *bu, int ruRank, int buRank, int processRank,
                                                                                           std::size_t messageSize, std::size_t iterations, std::size_t syncIterations)
 {
@@ -339,3 +341,4 @@ std::size_t variableNonBlockingCommunication(int8_t *bufferSnd, int8_t *bufferRc
 {
     return 0;
 }
+*/

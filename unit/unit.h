@@ -15,10 +15,14 @@
 class Unit
 {
 public:
+    Unit(int rank);
     ~Unit() {}
     void allocateMemory();
 
     const int getRank() { return m_rank; }
+
+    const std::string getId() { return m_id; }
+    void setId(std::string id) { m_id = id; }
 
     const std::size_t getBufferBytes() const { return m_bufferBytes; }
     void setBufferBytes(std::size_t bytes) { m_bufferBytes = bytes; }
@@ -27,6 +31,7 @@ public:
 
 protected:
     int m_rank;
+    std::string m_id;
 
     typedef std::unique_ptr<void, std::function<void(void *)>> buffer_t;
 
