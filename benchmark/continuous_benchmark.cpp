@@ -195,15 +195,16 @@ void ContinuousBenchmark::run()
                 errorMessageCount = result.first;
                 transferredSize = result.second;
             }
+            */
             else if (m_commType == COMM_VARIABLE_BLOCKING)
             {
-                std::pair<std::size_t, std::size_t> result = CommunicationInterface::unitsVariableBlockingCommunication(m_readoutUnit.get(), m_builderUnit.get(), ruRank, buRank, m_rank,
+                std::pair<std::size_t, std::size_t> result = CommunicationInterface::unitsVariableBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
                                                                                                                         m_messageSizes, m_iterations);
 
                 errorMessageCount = result.first;
                 transferredSize = result.second;
             }
-
+            /*
             else if (m_commType == COMM_VARIABLE_NONBLOCKING)
             {
                 //std::pair<std::size_t, std::size_t> result = CommunicationInterface::blockingCommunication(m_bufferSnd, m_bufferRcv, m_sndBufferBytes, m_rcvBufferBytes,

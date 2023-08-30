@@ -218,7 +218,8 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::unitsNonBlockingComm
 
     return std::make_pair(errorMessageCount, transferredSize);
 }
-
+*/
+/*
 std::pair<std::size_t, std::size_t> CommunicationInterface::variableBlockingCommunication(int8_t *bufferSnd, int8_t *bufferRcv,
                                                                                           std::size_t sndBufferBytes, std::size_t rcvBufferBytes,
                                                                                           std::vector<std::size_t> messageSizes, int rank, std::size_t iterations)
@@ -273,8 +274,9 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::variableBlockingComm
 
     return std::make_pair(errorMessageCount, transferredSize);
 }
+*/
 
-std::pair<std::size_t, std::size_t> CommunicationInterface::unitsVariableBlockingCommunication(ReadoutUnit *ru, BuilderUnit *bu, int ruRank, int buRank, int processRank,
+std::pair<std::size_t, std::size_t> CommunicationInterface::unitsVariableBlockingCommunication(Unit *unit, int ruRank, int buRank, int processRank,
                                                                                                std::vector<std::size_t> messageSizes, std::size_t iterations)
 {
     std::vector<MPI_Status> statuses(iterations);
@@ -283,8 +285,8 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::unitsVariableBlockin
 
     if (processRank == ruRank)
     {
-        int8_t *bufferSnd = ru->getBuffer();
-        const std::size_t sndBufferBytes = ru->getBufferBytes();
+        int8_t *bufferSnd = unit->getBuffer();
+        const std::size_t sndBufferBytes = unit->getBufferBytes();
         std::size_t sendOffset = 0;
 
         int sndMessageSize;
@@ -309,8 +311,8 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::unitsVariableBlockin
     }
     else if (processRank == buRank)
     {
-        int8_t *bufferRcv = bu->getBuffer();
-        const std::size_t rcvBufferBytes = bu->getBufferBytes();
+        int8_t *bufferRcv = unit->getBuffer();
+        const std::size_t rcvBufferBytes = unit->getBufferBytes();
         std::size_t recvOffset = 0;
         std::size_t rcvMessageSize;
 
@@ -335,6 +337,7 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::unitsVariableBlockin
     return std::make_pair(errorMessageCount, transferredSize);
 }
 
+/*
 std::size_t variableNonBlockingCommunication(int8_t *bufferSnd, int8_t *bufferRcv,
                                              std::size_t sndBufferBytes, std::size_t rcvBufferBytes,
                                              std::vector<std::size_t> messageSizes, int rank, std::size_t iterations, std::size_t syncIterations, std::size_t *transferredSize)
