@@ -20,8 +20,20 @@ BenchmarkVariableMessage::BenchmarkVariableMessage(std::vector<ArgumentEntry> ar
     if (m_rank == 0)
     {
         std::cout << std::endl
-                  << "Performing variable size benchmark." << std::endl
-                  << "Available sizes: " << m_messageSizeVariants << " (range: 10000 B - " << m_ruBufferBytes << " B)" << std::endl;
+                  << "Performing variable size benchmark. "
+                  << std::endl;
+
+        if (commType == COMM_VARIABLE_BLOCKING)
+        {
+            std::cout << "Blocking communication." << std::endl
+                      << std::endl;
+        }
+        else if (commType == COMM_VARIABLE_NONBLOCKING)
+        {
+            std::cout << "Non-blocking communication." << std::endl
+                      << std::endl;
+        }
+        std::cout << "Available sizes: " << m_messageSizeVariants << " (range: 10000 B - " << m_ruBufferBytes << " B)" << std::endl;
 
         std::cout << std::endl
                   << std::left << std::setw(20) << "RU buffer size:"

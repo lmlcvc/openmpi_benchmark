@@ -1,8 +1,8 @@
 #include "communication_interface.h"
 
-std::pair<std::size_t, std::size_t> CommunicationInterface::blockingCommunication(int8_t *bufferSnd, int8_t *bufferRcv,
-                                                                                  std::size_t sndBufferBytes, std::size_t rcvBufferBytes,
-                                                                                  std::size_t messageSize, int rank, std::size_t iterations)
+std::pair<std::size_t, std::size_t> CommunicationInterface::twoRankBlockingCommunication(int8_t *bufferSnd, int8_t *bufferRcv,
+                                                                                         std::size_t sndBufferBytes, std::size_t rcvBufferBytes,
+                                                                                         std::size_t messageSize, int rank, std::size_t iterations)
 {
     std::vector<MPI_Status> statuses(iterations);
     std::size_t sendOffset = 0, recvOffset = 0;
@@ -45,9 +45,8 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::blockingCommunicatio
     return std::make_pair(errorMessageCount, transferredSize);
 }
 
-// TODO: don't ignore status
-std::pair<std::size_t, std::size_t> CommunicationInterface::unitsBlockingCommunication(Unit *unit, int ruRank, int buRank, int processRank,
-                                                                                       std::size_t messageSize, std::size_t iterations)
+std::pair<std::size_t, std::size_t> CommunicationInterface::blockingCommunication(Unit *unit, int ruRank, int buRank, int processRank,
+                                                                                  std::size_t messageSize, std::size_t iterations)
 {
 
     std::vector<MPI_Status> statuses(iterations);
@@ -60,8 +59,6 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::unitsBlockingCommuni
         int8_t *bufferSnd = unit->getBuffer();
         const std::size_t sndBufferBytes = unit->getBufferBytes();
         std::size_t sendOffset = 0;
-
-        std::cout << "Sending from " << ruRank << " to " << buRank << std::endl;
 
         for (std::size_t i = 0; i < iterations; i++)
         {
@@ -96,12 +93,11 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::unitsBlockingCommuni
 
     transferredSize -= messageSize * errorMessageCount;
 
-    // Return both error message count and transferred size.
     return std::make_pair(errorMessageCount, transferredSize);
 }
 
-std::pair<std::size_t, std::size_t> CommunicationInterface::unitsNonBlockingCommunication(Unit *unit, int ruRank, int buRank, int processRank,
-                                                                                          std::size_t messageSize, std::size_t iterations, std::size_t syncIterations)
+std::pair<std::size_t, std::size_t> CommunicationInterface::nonBlockingCommunication(Unit *unit, int ruRank, int buRank, int processRank,
+                                                                                     std::size_t messageSize, std::size_t iterations, std::size_t syncIterations)
 {
     std::vector<MPI_Request> sendRequests(iterations);
     std::vector<MPI_Request> recvRequests(iterations);
@@ -158,9 +154,8 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::unitsNonBlockingComm
     return std::make_pair(errorMessageCount, transferredSize);
 }
 
-// TODO: don't ignore status
-std::pair<std::size_t, std::size_t> CommunicationInterface::unitsVariableBlockingCommunication(Unit *unit, int ruRank, int buRank, int processRank,
-                                                                                               std::vector<std::size_t> messageSizes, std::size_t iterations)
+std::pair<std::size_t, std::size_t> CommunicationInterface::variableBlockingCommunication(Unit *unit, int ruRank, int buRank, int processRank,
+                                                                                          std::vector<std::size_t> messageSizes, std::size_t iterations)
 {
     std::vector<MPI_Status> statuses(iterations);
 
@@ -207,8 +202,10 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::unitsVariableBlockin
 
             MPI_Recv(bufferRcv + recvOffset, rcvMessageSize, MPI_BYTE, ruRank, 0, MPI_COMM_WORLD, &statuses[i]);
 
-            transferredSize += rcvMessageSize;
             recvOffset = (recvOffset + rcvMessageSize) % rcvBufferBytes;
+
+            if (statuses.at(i).MPI_ERROR == MPI_SUCCESS)
+                transferredSize += rcvMessageSize;
         }
     }
 
@@ -285,7 +282,6 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::variableNonBlockingC
 
     if (processRank == ruRank)
         MPI_Waitall(iterations, sendRequests.data(), statuses.data());
-
 
     errorMessageCount = std::count_if(statuses.begin(), statuses.end(),
                                       [](const MPI_Status &status)

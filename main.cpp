@@ -18,13 +18,6 @@ volatile sig_atomic_t sigintReceived = 0;
 // FRAG_SIZE
 // CHUNK_SIZE - if none, do not split message ( = FRAG_SIZE )
 
-// TODO: adapt fixed non-blocking benchmark to units
-// After that, follow same logic for variable communication.
-
-// FIXME: rank logic
-// Each unit should have its own rank
-// A unit ID can be the same between a RU and a BU, but they will be a different rank
-
 void handleSignals(int signal)
 {
     if (signal == SIGINT)

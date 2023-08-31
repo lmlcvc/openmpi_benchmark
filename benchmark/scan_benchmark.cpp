@@ -118,7 +118,7 @@ void ScanBenchmark::run()
         transferredSize = 0;
         clock_gettime(CLOCK_MONOTONIC, &startTime);
 
-        std::pair<std::size_t, std::size_t> result = CommunicationInterface::blockingCommunication(m_bufferSnd, m_bufferRcv, m_sndBufferBytes, m_rcvBufferBytes,
+        std::pair<std::size_t, std::size_t> result = CommunicationInterface::twoRankBlockingCommunication(m_bufferSnd, m_bufferRcv, m_sndBufferBytes, m_rcvBufferBytes,
                                                                                                    currentMessageSize, m_rank, m_iterations);
         errorMessageCount += result.first;
         transferredSize = result.second;

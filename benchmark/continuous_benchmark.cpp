@@ -47,13 +47,13 @@ void ContinuousBenchmark::initUnitLists()
 
     if (m_rank == 0)
     {
-        std::cout << "m_readoutUnits:" << std::endl;
+        std::cout << "RUs:" << std::endl;
         for (const auto &unit : m_readoutUnits)
         {
             std::cout << "Rank: " << unit.rank << ", ID: " << unit.id << std::endl;
         }
 
-        std::cout << "m_builderUnits:" << std::endl;
+        std::cout << "\nBUs:" << std::endl;
         for (const auto &unit : m_builderUnits)
         {
             std::cout << "Rank: " << unit.rank << ", ID: " << unit.id << std::endl;
@@ -106,7 +106,7 @@ void ContinuousBenchmark::performWarmup()
         buRank = (1 + ruRank) % m_nodesCount;
         if (m_rank == ruRank || m_rank == buRank)
         {
-            std::pair<std::size_t, std::size_t> result = CommunicationInterface::unitsBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
+            std::pair<std::size_t, std::size_t> result = CommunicationInterface::blockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
                                                                                                             messageSize, m_warmupIterations);
             transferredSize += result.second;
         }
@@ -138,7 +138,7 @@ void ContinuousBenchmark::performWarmup()
         if (m_rank == ruRank || m_rank == buRank)
         {
             std::cout << m_rank << std::endl;
-            std::pair<std::size_t, std::size_t> result = CommunicationInterface::unitsBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
+            std::pair<std::size_t, std::size_t> result = CommunicationInterface::blockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
                                                                                                             messageSize, m_warmupIterations);
             transferredSize += result.second;
         }
@@ -178,14 +178,14 @@ void ContinuousBenchmark::run()
         {
             if (m_commType == COMM_FIXED_BLOCKING)
             {
-                std::pair<std::size_t, std::size_t> result = CommunicationInterface::unitsBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
+                std::pair<std::size_t, std::size_t> result = CommunicationInterface::blockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
                                                                                                                 m_messageSize, m_iterations);
                 errorMessageCount = result.first;
                 transferredSize = result.second;
             }
             else if (m_commType == COMM_FIXED_NONBLOCKING)
             {
-                std::pair<std::size_t, std::size_t> result = CommunicationInterface::unitsNonBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
+                std::pair<std::size_t, std::size_t> result = CommunicationInterface::nonBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
                                                                                                                    m_messageSize, m_iterations, m_syncIterations);
 
                 errorMessageCount = result.first;
@@ -193,7 +193,7 @@ void ContinuousBenchmark::run()
             }
             else if (m_commType == COMM_VARIABLE_BLOCKING)
             {
-                std::pair<std::size_t, std::size_t> result = CommunicationInterface::unitsVariableBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
+                std::pair<std::size_t, std::size_t> result = CommunicationInterface::variableBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
                                                                                                                         m_messageSizes, m_iterations);
 
                 errorMessageCount = result.first;

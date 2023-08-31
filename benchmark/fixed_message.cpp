@@ -26,8 +26,19 @@ BenchmarkFixedMessage::BenchmarkFixedMessage(std::vector<ArgumentEntry> args, in
     if (m_rank == 0)
     {
         std::cout << std::endl
-                  << "Performing fixed size benchmark." << std::endl
+                  << "Performing fixed size benchmark. "
                   << std::endl;
+
+        if (commType == COMM_FIXED_BLOCKING)
+        {
+            std::cout << "Blocking communication." << std::endl
+                      << std::endl;
+        }
+        else if (commType == COMM_FIXED_NONBLOCKING)
+        {
+            std::cout << "Non-blocking communication." << std::endl
+                      << std::endl;
+        }
 
         std::cout << std::left << std::setw(20) << "Message size:"
                   << std::right << std::setw(10) << m_messageSize << " B" << std::endl;
@@ -104,7 +115,7 @@ void BenchmarkFixedMessage::printIterationInfo(timespec startTime, timespec endT
 
     std::cout << std::right << std::setw(7) << m_currentPhase
               << " | " << std::setw(7) << ruId
-              << " | " << std::setw(7) << buId      // FIXME: not printing
+              << " | " << std::setw(7) << buId // FIXME: not printing
               << " | " << std::setw(12) << avgRtt << " s"
               << " | " << std::setw(11) << std::fixed << std::setprecision(2) << avgThroughput << " Mbit/s"
               << " | " << std::setw(10) << errorMessagesCount << std::endl
