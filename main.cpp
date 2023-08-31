@@ -203,8 +203,7 @@ int main(int argc, char **argv)
 
     // Run program
     clock_gettime(CLOCK_MONOTONIC, &runStartTime);
-    // TODO: adapt warmup to new logic
-    // benchmark->performWarmup();
+    benchmark->performWarmup();
     do
     {
         benchmark->run();

@@ -94,6 +94,72 @@ void ScanBenchmark::printRunInfo(std::size_t messageSize, double throughput)
               << " |\n";
 }
 
+void ScanBenchmark::warmupCommunication(std::vector<std::pair<int, int>> subarrayIndices, int ruRank, int buRank)
+{
+    std::size_t subarrayCount = subarrayIndices.size();
+    std::size_t subarraySize;
+
+    if (m_rank == ruRank)
+        std::cout << "Performing warmup...";
+
+    if (m_rank == ruRank)
+    {
+        for (int i = 0; i < subarrayCount; i++)
+        {
+            subarraySize = subarrayIndices[i].second - subarrayIndices[i].first + 1;
+            MPI_Send(m_bufferSnd + subarrayIndices[i].first, subarraySize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
+        }
+    }
+    else if (m_rank == buRank)
+    {
+        for (int i = 0; i < subarrayCount; i++)
+        {
+            subarraySize = subarrayIndices[i].second - subarrayIndices[i].first + 1;
+            MPI_Recv(m_bufferRcv + subarrayIndices[i].first, subarraySize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        }
+    }
+
+    if (m_rank == ruRank)
+        std::cout << "Done." << std::endl;
+}
+
+void ScanBenchmark::performWarmup()
+{
+    timespec startTime, endTime;
+    double throughput;
+    std::size_t messageSize = m_sndBufferBytes / 10;
+    std::size_t transferredSize = 0;
+
+    std::vector<std::pair<int, int>> subarrayIndices = findSubarrayIndices(m_sndBufferBytes);
+
+    clock_gettime(CLOCK_MONOTONIC, &startTime);
+    std::pair<std::size_t, std::size_t> result = CommunicationInterface::twoRankBlockingCommunication(m_bufferSnd, m_bufferRcv, m_sndBufferBytes, m_rcvBufferBytes,
+                                                                                                      messageSize, m_rank, m_warmupIterations);
+    transferredSize = result.second;
+
+    clock_gettime(CLOCK_MONOTONIC, &endTime);
+    std::tie(std::ignore, throughput) = calculateThroughput(startTime, endTime, transferredSize, m_warmupIterations);
+
+    if (m_rank == 0)
+        std::cout << "\nPre-warmup throughput: " << throughput << " Mbit/s" << std::endl;
+
+    warmupCommunication(subarrayIndices, 0, 1);
+
+    transferredSize = 0;
+    clock_gettime(CLOCK_MONOTONIC, &startTime);
+
+    result = CommunicationInterface::twoRankBlockingCommunication(m_bufferSnd, m_bufferRcv, m_sndBufferBytes, m_rcvBufferBytes,
+                                                                  messageSize, m_rank, m_warmupIterations);
+    transferredSize = result.second;
+    clock_gettime(CLOCK_MONOTONIC, &endTime);
+
+    std::tie(std::ignore, throughput) = calculateThroughput(startTime, endTime, transferredSize, m_warmupIterations);
+
+    if (m_rank == 0)
+        std::cout << "Post-warmup throughput: " << throughput << " Mbit/s\n"
+                  << std::endl;
+}
+
 void ScanBenchmark::run()
 {
     if (m_rank == 0)
@@ -119,7 +185,7 @@ void ScanBenchmark::run()
         clock_gettime(CLOCK_MONOTONIC, &startTime);
 
         std::pair<std::size_t, std::size_t> result = CommunicationInterface::twoRankBlockingCommunication(m_bufferSnd, m_bufferRcv, m_sndBufferBytes, m_rcvBufferBytes,
-                                                                                                   currentMessageSize, m_rank, m_iterations);
+                                                                                                          currentMessageSize, m_rank, m_iterations);
         errorMessageCount += result.first;
         transferredSize = result.second;
 
