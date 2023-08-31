@@ -161,7 +161,6 @@ void ContinuousBenchmark::run()
     std::size_t errorMessageCount = -1;
     std::size_t transferredSize = -1;
 
-    // ru rank is just going throught m_readUnits ranks
     for (int i = 0; i < m_readoutUnits.size(); i++)
     {
         ruRankIndex = i;
@@ -184,18 +183,14 @@ void ContinuousBenchmark::run()
                 errorMessageCount = result.first;
                 transferredSize = result.second;
             }
-            /*
             else if (m_commType == COMM_FIXED_NONBLOCKING)
             {
-                std::pair<std::size_t, std::size_t> result = CommunicationInterface::unitsNonBlockingCommunication(m_readoutUnit.get(), m_builderUnit.get(), ruRank, buRank, m_rank,
+                std::pair<std::size_t, std::size_t> result = CommunicationInterface::unitsNonBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
                                                                                                                    m_messageSize, m_iterations, m_syncIterations);
 
-                // std::pair<std::size_t, std::size_t> result = CommunicationInterface::nonBlockingCommunication(m_bufferSnd, m_bufferRcv, m_sndBufferBytes, m_rcvBufferBytes,
-                //                                                                                               m_messageSize, m_rank, m_iterations, m_syncIterations);
                 errorMessageCount = result.first;
                 transferredSize = result.second;
             }
-            */
             else if (m_commType == COMM_VARIABLE_BLOCKING)
             {
                 std::pair<std::size_t, std::size_t> result = CommunicationInterface::unitsVariableBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank,

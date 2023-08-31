@@ -149,8 +149,9 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::nonBlockingCommunica
     // Return both error message count and transferred size.
     return std::make_pair(errorMessageCount, transferredSize);
 }
+*/
 
-std::pair<std::size_t, std::size_t> CommunicationInterface::unitsNonBlockingCommunication(ReadoutUnit *ru, BuilderUnit *bu, int ruRank, int buRank, int processRank,
+std::pair<std::size_t, std::size_t> CommunicationInterface::unitsNonBlockingCommunication(Unit *unit, int ruRank, int buRank, int processRank,
                                                                                           std::size_t messageSize, std::size_t iterations, std::size_t syncIterations)
 {
     std::vector<MPI_Request> sendRequests(iterations);
@@ -160,29 +161,13 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::unitsNonBlockingComm
     std::size_t errorMessageCount = 0;
     std::size_t transferredSize = messageSize * iterations;
 
-    int8_t *bufferSnd;
-    int8_t *bufferRcv;
-    std::size_t sndBufferBytes;
-    std::size_t rcvBufferBytes;
-    std::size_t sendOffset;
-    std::size_t recvOffset;
-
     if (processRank == ruRank)
     {
-        bufferSnd = ru->getBuffer();
-        sndBufferBytes = ru->getBufferBytes();
-        sendOffset = 0;
-    }
-    else if (processRank == buRank)
-    {
-        bufferRcv = bu->getBuffer();
-        rcvBufferBytes = bu->getBufferBytes();
-        recvOffset = 0;
-    }
+        int8_t *bufferSnd = unit->getBuffer();
+        std::size_t sndBufferBytes = unit->getBufferBytes();
+        std::size_t sendOffset = 0;
 
-    for (std::size_t i = 0; i < iterations; i++)
-    {
-        if (processRank == ruRank)
+        for (std::size_t i = 0; i < iterations; i++)
         {
             if (sendOffset + messageSize > sndBufferBytes)
                 sendOffset = 0;
@@ -190,24 +175,29 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::unitsNonBlockingComm
             MPI_Isend(bufferSnd + sendOffset, messageSize, MPI_BYTE, buRank, 0, MPI_COMM_WORLD, &sendRequests[i]);
 
             sendOffset = (sendOffset + messageSize) % sndBufferBytes;
+
+            if (iterations % syncIterations == 0)
+                MPI_Waitall(i + 1, sendRequests.data(), statuses.data());
         }
-        else if (processRank == buRank)
-        {
-            for (std::size_t i = 0; i < iterations; i++)
-            {
-                if (recvOffset + messageSize > rcvBufferBytes)
-                    recvOffset = 0;
-
-                MPI_Irecv(bufferRcv + recvOffset, messageSize, MPI_BYTE, ruRank, 0, MPI_COMM_WORLD, &sendRequests[i]);
-
-                recvOffset = (recvOffset + messageSize) % rcvBufferBytes;
-            }
-        }
-
-        if ((iterations % syncIterations == 0 && ((processRank == ruRank) || (processRank == buRank))))
-            MPI_Waitall(i + 1, sendRequests.data(), statuses.data());
     }
-    if ((processRank == ruRank) || (processRank == buRank))
+    else if (processRank == buRank)
+    {
+        int8_t *bufferRcv = unit->getBuffer();
+        std::size_t rcvBufferBytes = unit->getBufferBytes();
+        std::size_t recvOffset = 0;
+
+        for (std::size_t i = 0; i < iterations; i++)
+        {
+            if (recvOffset + messageSize > rcvBufferBytes)
+                recvOffset = 0;
+
+            MPI_Irecv(bufferRcv + recvOffset, messageSize, MPI_BYTE, ruRank, 0, MPI_COMM_WORLD, &recvRequests[i]);
+
+            recvOffset = (recvOffset + messageSize) % rcvBufferBytes;
+        }
+    }
+
+    if (processRank == ruRank)
         MPI_Waitall(iterations, sendRequests.data(), statuses.data());
 
     errorMessageCount = std::count_if(statuses.begin(), statuses.end(),
@@ -218,7 +208,7 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::unitsNonBlockingComm
 
     return std::make_pair(errorMessageCount, transferredSize);
 }
-*/
+
 /*
 std::pair<std::size_t, std::size_t> CommunicationInterface::variableBlockingCommunication(int8_t *bufferSnd, int8_t *bufferRcv,
                                                                                           std::size_t sndBufferBytes, std::size_t rcvBufferBytes,

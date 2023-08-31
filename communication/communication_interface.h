@@ -26,10 +26,12 @@ public:
     std::pair<std::size_t, std::size_t> nonBlockingCommunication(int8_t *bufferSnd, int8_t *bufferRcv,
                                                                  std::size_t sndBufferBytes, std::size_t rcvBufferBytes,
                                                                  std::size_t messageSize, int rank, std::size_t iterations, std::size_t syncIterations);
+````*/
 
-    std::pair<std::size_t, std::size_t> unitsNonBlockingCommunication(ReadoutUnit *ru, BuilderUnit *bu, int ruRank, int buRank, int processRank,
+    std::pair<std::size_t, std::size_t> unitsNonBlockingCommunication(Unit *unit, int ruRank, int buRank, int processRank,
                                                                       std::size_t messageSize, std::size_t iterations, std::size_t syncIterations);
 
+    /*
     std::pair<std::size_t, std::size_t> variableBlockingCommunication(int8_t *bufferSnd, int8_t *bufferRcv,
                                                                       std::size_t sndBufferBytes, std::size_t rcvBufferBytes,
                                                                       std::vector<std::size_t> messageSizes, int rank, std::size_t iterations);
