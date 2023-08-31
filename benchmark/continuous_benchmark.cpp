@@ -199,19 +199,17 @@ void ContinuousBenchmark::run()
                 errorMessageCount = result.first;
                 transferredSize = result.second;
             }
-            /*
             else if (m_commType == COMM_VARIABLE_NONBLOCKING)
             {
-                //std::pair<std::size_t, std::size_t> result = CommunicationInterface::blockingCommunication(m_bufferSnd, m_bufferRcv, m_sndBufferBytes, m_rcvBufferBytes,
-                                                                                                           m_messageSize, m_rank, m_iterations);
-                //errorMessageCount = result.first;
-                //transferredSize = result.second;
+                std::pair<std::size_t, std::size_t> result = CommunicationInterface::variableNonBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
+                                                                                                                      m_messageSizes, m_iterations, m_syncIterations);
+                errorMessageCount = result.first;
+                transferredSize = result.second;
             }
-            */
 
             clock_gettime(CLOCK_MONOTONIC, &endTime);
 
-            if (m_rank == ruRank)
+            if (m_rank == buRank)
                 printIterationInfo(startTime, endTime, ruId, buId, transferredSize, errorMessageCount);
         }
     }
