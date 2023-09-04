@@ -17,7 +17,6 @@ public:
                                                                      std::size_t sndBufferBytes, std::size_t rcvBufferBytes,
                                                                      std::size_t messageSize, int rank, std::size_t iterations);
 
-    // specified ranks
     std::pair<std::size_t, std::size_t> blockingCommunication(Unit *unit, int ruRank, int buRank, int processRank,
                                                               std::size_t messageSize, std::size_t iterations);
 

@@ -181,6 +181,10 @@ void ContinuousBenchmark::run()
                                                                                                            m_messageSize, m_iterations);
                 errorMessageCount = result.first;
                 transferredSize = result.second;
+
+                clock_gettime(CLOCK_MONOTONIC, &endTime);
+                if (m_rank == ruRank)
+                    printIterationInfo(startTime, endTime, ruId, buId, transferredSize, errorMessageCount);
             }
             else if (m_commType == COMM_FIXED_NONBLOCKING)
             {
@@ -189,6 +193,10 @@ void ContinuousBenchmark::run()
 
                 errorMessageCount = result.first;
                 transferredSize = result.second;
+
+                clock_gettime(CLOCK_MONOTONIC, &endTime);
+                if (m_rank == ruRank)
+                    printIterationInfo(startTime, endTime, ruId, buId, transferredSize, errorMessageCount);
             }
             else if (m_commType == COMM_VARIABLE_BLOCKING)
             {
@@ -197,6 +205,10 @@ void ContinuousBenchmark::run()
 
                 errorMessageCount = result.first;
                 transferredSize = result.second;
+
+                clock_gettime(CLOCK_MONOTONIC, &endTime);
+                if (m_rank == buRank)
+                    printIterationInfo(startTime, endTime, ruId, buId, transferredSize, errorMessageCount);
             }
             else if (m_commType == COMM_VARIABLE_NONBLOCKING)
             {
@@ -204,12 +216,11 @@ void ContinuousBenchmark::run()
                                                                                                                       m_messageSizes, m_iterations, m_syncIterations);
                 errorMessageCount = result.first;
                 transferredSize = result.second;
+
+                clock_gettime(CLOCK_MONOTONIC, &endTime);
+                if (m_rank == buRank)
+                    printIterationInfo(startTime, endTime, ruId, buId, transferredSize, errorMessageCount);
             }
-
-            clock_gettime(CLOCK_MONOTONIC, &endTime);
-
-            if (m_rank == buRank)
-                printIterationInfo(startTime, endTime, ruId, buId, transferredSize, errorMessageCount);
         }
     }
     m_currentPhase++;
