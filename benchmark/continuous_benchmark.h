@@ -18,7 +18,7 @@ public:
 
 protected:
     void initUnitLists();
-    virtual void printIterationInfo(timespec startTime, timespec endTime, std::string ruId, std::string buId,
+    virtual void printIterationInfo(timespec startTime, timespec endTime, std::string& ruId, std::string& buId,
                                     std::size_t transferredSize, std::size_t errorMessagesCount) = 0;
 
     CommunicationType m_commType = COMM_UNDEFINED;

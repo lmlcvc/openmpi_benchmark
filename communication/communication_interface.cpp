@@ -99,8 +99,9 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::blockingCommunicatio
 std::pair<std::size_t, std::size_t> CommunicationInterface::nonBlockingCommunication(Unit *unit, int ruRank, int buRank, int processRank,
                                                                                      std::size_t messageSize, std::size_t iterations, std::size_t syncIterations)
 {
-    std::vector<MPI_Request> sendRequests(syncIterations);
-    std::vector<MPI_Request> recvRequests(syncIterations);
+    syncIterations = iterations;
+    std::vector<MPI_Request> sendRequests(iterations);
+    std::vector<MPI_Request> recvRequests(iterations);
     std::vector<MPI_Status> statuses(iterations);
 
     std::size_t errorMessageCount = 0;
@@ -117,15 +118,9 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::nonBlockingCommunica
             if (sendOffset + messageSize > sndBufferBytes)
                 sendOffset = 0;
 
-            MPI_Isend(bufferSnd + sendOffset, messageSize, MPI_BYTE, buRank, 0, MPI_COMM_WORLD, &sendRequests[i % syncIterations]);
+            MPI_Isend(bufferSnd + sendOffset, messageSize, MPI_BYTE, buRank, 0, MPI_COMM_WORLD, &sendRequests[i]);
 
             sendOffset = (sendOffset + messageSize) % sndBufferBytes;
-
-            if ((i + 1) % syncIterations == 0)
-            {
-                int statusesOffset = i - (syncIterations - 1);
-                MPI_Waitall(syncIterations, sendRequests.data(), statuses.data() + statusesOffset);
-            }
         }
     }
     else if (processRank == buRank)
@@ -146,7 +141,10 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::nonBlockingCommunica
     }
 
     if (processRank == ruRank)
-        MPI_Waitall(iterations % syncIterations, sendRequests.data(), statuses.data());
+        MPI_Waitall(iterations, sendRequests.data(), statuses.data());
+
+    if (processRank == buRank)
+        MPI_Waitall(iterations, recvRequests.data(), statuses.data());
 
     errorMessageCount = std::count_if(statuses.begin(), statuses.end(),
                                       [](const MPI_Status &status)
@@ -222,8 +220,8 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::variableBlockingComm
 std::pair<std::size_t, std::size_t> CommunicationInterface::variableNonBlockingCommunication(Unit *unit, int ruRank, int buRank, int processRank,
                                                                                              std::vector<std::size_t> messageSizes, std::size_t iterations, std::size_t syncIterations)
 {
-    std::vector<MPI_Request> sendRequests(syncIterations);
-    std::vector<MPI_Request> recvRequests(syncIterations);
+    std::vector<MPI_Request> sendRequests(iterations);
+    std::vector<MPI_Request> recvRequests(iterations);
     std::vector<MPI_Status> statuses(iterations);
 
     std::size_t errorMessageCount = 0;
@@ -251,16 +249,9 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::variableNonBlockingC
             if (sendOffset + sndMessageSize > sndBufferBytes)
                 sendOffset = 0;
 
-            MPI_Isend(bufferSnd + sendOffset, sndMessageSize, MPI_BYTE, buRank, 0, MPI_COMM_WORLD, &sendRequests[i % syncIterations]);
+            MPI_Isend(bufferSnd + sendOffset, sndMessageSize, MPI_BYTE, buRank, 0, MPI_COMM_WORLD, &sendRequests[i]);
 
             sendOffset = (sendOffset + sndMessageSize) % sndBufferBytes;
-
-            // Wait sync after syncIterations
-            if ((i + 1) % syncIterations == 0)
-            {
-                int statusesOffset = i - (syncIterations - 1);
-                MPI_Waitall(syncIterations, sendRequests.data(), statuses.data() + statusesOffset);
-            }
         }
     }
     else if (processRank == buRank)
@@ -277,7 +268,7 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::variableNonBlockingC
             if (recvOffset + rcvMessageSize > rcvBufferBytes)
                 recvOffset = 0;
 
-            MPI_Irecv(bufferRcv + recvOffset, rcvMessageSize, MPI_BYTE, ruRank, 0, MPI_COMM_WORLD, &recvRequests[i % syncIterations]);
+            MPI_Irecv(bufferRcv + recvOffset, rcvMessageSize, MPI_BYTE, ruRank, 0, MPI_COMM_WORLD, &recvRequests[i]);
 
             recvOffset = (recvOffset + rcvMessageSize) % rcvBufferBytes;
 
@@ -287,7 +278,10 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::variableNonBlockingC
     }
 
     if (processRank == ruRank)
-        MPI_Waitall(iterations % syncIterations, sendRequests.data(), statuses.data());
+        MPI_Waitall(iterations, sendRequests.data(), statuses.data());
+
+    if (processRank == buRank)
+        MPI_Waitall(iterations, recvRequests.data(), statuses.data());
 
     errorMessageCount = std::count_if(statuses.begin(), statuses.end(),
                                       [](const MPI_Status &status)

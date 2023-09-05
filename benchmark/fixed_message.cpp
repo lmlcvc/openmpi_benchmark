@@ -94,7 +94,7 @@ void BenchmarkFixedMessage::parseArguments(std::vector<ArgumentEntry> args)
     }
 }
 
-void BenchmarkFixedMessage::printIterationInfo(timespec startTime, timespec endTime, std::string ruId, std::string buId,
+void BenchmarkFixedMessage::printIterationInfo(timespec startTime, timespec endTime, std::string& ruId, std::string& buId,
                                                std::size_t transferredSize, std::size_t errorMessagesCount)
 {
     timespec elapsedTime = diff(startTime, endTime);

@@ -70,20 +70,26 @@ void ContinuousBenchmark::warmupCommunication(std::vector<std::pair<int, int>> s
     {
         int8_t *bufferSnd = m_unit->getBuffer();
 
-        for (std::size_t i = 0; i < subarrayCount; i++)
+        for (std::size_t i = 0; i < m_warmupIterations; i++)
         {
-            subarraySize = subarrayIndices[i].second - subarrayIndices[i].first + 1;
-            MPI_Send(bufferSnd + subarrayIndices[i].first, subarraySize, MPI_BYTE, buRank, 0, MPI_COMM_WORLD);
+            for (std::size_t i = 0; i < subarrayCount; i++)
+            {
+                subarraySize = subarrayIndices[i].second - subarrayIndices[i].first + 1;
+                MPI_Send(bufferSnd + subarrayIndices[i].first, subarraySize, MPI_BYTE, buRank, 0, MPI_COMM_WORLD);
+            }
         }
     }
     else if (m_rank == buRank)
     {
         int8_t *bufferRcv = m_unit->getBuffer();
 
-        for (std::size_t i = 0; i < subarrayCount; i++)
+        for (std::size_t i = 0; i < m_warmupIterations; i++)
         {
-            subarraySize = subarrayIndices[i].second - subarrayIndices[i].first + 1;
-            MPI_Recv(bufferRcv + subarrayIndices[i].first, subarraySize, MPI_BYTE, ruRank, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            for (std::size_t i = 0; i < subarrayCount; i++)
+            {
+                subarraySize = subarrayIndices[i].second - subarrayIndices[i].first + 1;
+                MPI_Recv(bufferRcv + subarrayIndices[i].first, subarraySize, MPI_BYTE, ruRank, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            }
         }
     }
 }
@@ -166,7 +172,7 @@ void ContinuousBenchmark::run()
         ruRank = m_readoutUnits.at(ruRankIndex).rank;
         ruId = m_readoutUnits.at(ruRankIndex).id;
 
-        buRankIndex = (m_currentPhase + i) % m_builderUnits.size();
+        buRankIndex = (m_currentPhase + ruRankIndex) % m_builderUnits.size();
         buRank = m_builderUnits.at(buRankIndex).rank;
         buId = m_builderUnits.at(ruRankIndex).rank;
 
@@ -223,6 +229,7 @@ void ContinuousBenchmark::run()
             }
         }
     }
+
     m_currentPhase++;
     MPI_Barrier(MPI_COMM_WORLD);
 }

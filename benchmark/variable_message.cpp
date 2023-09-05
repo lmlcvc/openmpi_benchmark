@@ -113,7 +113,7 @@ void BenchmarkVariableMessage::initMessageSizes()
     }
 }
 
-void BenchmarkVariableMessage::printIterationInfo(timespec startTime, timespec endTime, std::string ruId, std::string buId,
+void BenchmarkVariableMessage::printIterationInfo(timespec startTime, timespec endTime, std::string& ruId, std::string& buId,
                                                   std::size_t transferredSize, std::size_t errorMessagesCount)
 {
     timespec elapsedTime = diff(startTime, endTime);

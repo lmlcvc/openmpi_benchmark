@@ -13,7 +13,7 @@ public:
 
 private:
     void initMessageSizes();
-    void printIterationInfo(timespec startTime, timespec endTime, std::string ruId, std::string buId,
+    void printIterationInfo(timespec startTime, timespec endTime, std::string& ruId, std::string& buId,
                             std::size_t transferredSize, std::size_t errorMessagesCount) override;
     void parseArguments(std::vector<ArgumentEntry> args) override;
 

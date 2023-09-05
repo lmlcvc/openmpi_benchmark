@@ -104,18 +104,24 @@ void ScanBenchmark::warmupCommunication(std::vector<std::pair<int, int>> subarra
 
     if (m_rank == ruRank)
     {
-        for (int i = 0; i < subarrayCount; i++)
+        for (std::size_t i = 0; i < m_warmupIterations; i++)
         {
-            subarraySize = subarrayIndices[i].second - subarrayIndices[i].first + 1;
-            MPI_Send(m_bufferSnd + subarrayIndices[i].first, subarraySize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
+            for (int i = 0; i < subarrayCount; i++)
+            {
+                subarraySize = subarrayIndices[i].second - subarrayIndices[i].first + 1;
+                MPI_Send(m_bufferSnd + subarrayIndices[i].first, subarraySize, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
+            }
         }
     }
     else if (m_rank == buRank)
     {
-        for (int i = 0; i < subarrayCount; i++)
+        for (std::size_t i = 0; i < m_warmupIterations; i++)
         {
-            subarraySize = subarrayIndices[i].second - subarrayIndices[i].first + 1;
-            MPI_Recv(m_bufferRcv + subarrayIndices[i].first, subarraySize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            for (int i = 0; i < subarrayCount; i++)
+            {
+                subarraySize = subarrayIndices[i].second - subarrayIndices[i].first + 1;
+                MPI_Recv(m_bufferRcv + subarrayIndices[i].first, subarraySize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            }
         }
     }
 
