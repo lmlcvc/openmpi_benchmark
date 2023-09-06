@@ -160,27 +160,41 @@ void ContinuousBenchmark::performWarmup()
 void ContinuousBenchmark::run()
 {
     int ruRank, buRank;
-    int ruRankIndex, buRankIndex;
+    int ruRankIndex = -1, buRankIndex;
+    UnitInfo ru, bu;
     std::string ruId, buId;
+
     timespec startTime, endTime;
+
+    std::vector<std::pair<UnitInfo, UnitInfo>> pairs;
+
     std::size_t errorMessageCount = -1;
     std::size_t transferredSize = -1;
 
     for (int i = 0; i < m_readoutUnits.size(); i++)
     {
         ruRankIndex = i;
-        ruRank = m_readoutUnits.at(ruRankIndex).rank;
-        ruId = m_readoutUnits.at(ruRankIndex).id;
+        ru = m_readoutUnits.at(ruRankIndex);
 
         buRankIndex = (m_currentPhase + ruRankIndex) % m_builderUnits.size();
-        buRank = m_builderUnits.at(buRankIndex).rank;
-        buId = m_builderUnits.at(ruRankIndex).rank;
+        bu = m_builderUnits.at(buRankIndex);
+    
+        pairs.push_back(std::make_pair(ru, bu));
+    }
 
-        transferredSize = 0;
-        clock_gettime(CLOCK_MONOTONIC, &startTime);
+    for (const auto &pair : pairs)
+    {
+        ruRank = pair.first.rank;
+        buRank = pair.second.rank;
+
+        ruId = pair.first.id;
+        buId = pair.second.id;
 
         if (m_rank == ruRank || m_rank == buRank)
         {
+            transferredSize = 0;
+            clock_gettime(CLOCK_MONOTONIC, &startTime);
+
             if (m_commType == COMM_FIXED_BLOCKING)
             {
                 std::pair<std::size_t, std::size_t> result = CommunicationInterface::blockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
@@ -228,6 +242,8 @@ void ContinuousBenchmark::run()
                     printIterationInfo(startTime, endTime, ruId, buId, transferredSize, errorMessageCount);
             }
         }
+        else
+            continue;
     }
 
     m_currentPhase++;
