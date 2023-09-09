@@ -11,8 +11,6 @@ public:
 
 private:
     void parseArguments(std::vector<ArgumentEntry> args) override;
-    void printIterationInfo(double elapsedSecs, std::string &ruId, std::string &buId,
-                            std::size_t transferredSize, std::size_t errorMessagesCount) override;
 };
 
 #endif // BENCHMARKFIXEDMESSAGE_H

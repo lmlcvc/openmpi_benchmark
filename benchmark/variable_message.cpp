@@ -119,24 +119,4 @@ void BenchmarkVariableMessage::initMessageSizes()
     }
 }
 
-void BenchmarkVariableMessage::printIterationInfo(double elapsedSecs, std::string &ruId, std::string &buId,
-                                                  std::size_t transferredSize, std::size_t errorMessagesCount)
-{
-    double avgThroughput = (transferredSize * 8.0) / (elapsedSecs * 1e6);
 
-    std::cout << std::fixed << std::setprecision(8);
-
-    std::cout << std::right << std::setw(7) << "Phase"
-              << " | " << std::setw(7) << "RU"
-              << " | " << std::setw(7) << "BU"
-              << " | " << std::setw(25) << "Throughput"
-              << " | " << std::setw(10) << " Errors"
-              << std::endl;
-
-    std::cout << std::right << std::setw(7) << m_currentPhase
-              << " | " << std::setw(7) << ruId
-              << " | " << std::setw(7) << buId
-              << " | " << std::setw(18) << std::fixed << std::setprecision(2) << avgThroughput << " Mbit/s"
-              << " | " << std::setw(10) << errorMessagesCount << std::endl
-              << std::endl;
-}

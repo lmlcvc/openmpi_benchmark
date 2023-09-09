@@ -198,6 +198,7 @@ void ContinuousBenchmark::performWarmup()
                   << std::endl;
 }
 
+// TODO: change body with performAverageThroughput logging
 void ContinuousBenchmark::handleAverageThroughput()
 {
     double avgThroughput = (m_totalTransferredSize * 8.0) / (m_totalElapsedTime * 1e6);
@@ -228,6 +229,63 @@ void ContinuousBenchmark::handleAverageThroughput()
     else
     {
         std::cerr << "Failed to open file: " << m_avgThroughputFilepath << std::endl;
+    }
+}
+
+void ContinuousBenchmark::performPhaseLogging(std::string ruId, std::string buId,
+                                              double throughput, std::size_t errors, double averageRtt = -1)
+{
+    // printing
+    std::cout << std::fixed << std::setprecision(8);
+    std::cout << std::right << std::setw(7) << "Phase"
+              << " | " << std::setw(7) << "RU"
+              << " | " << std::setw(7) << "BU";
+
+    if (m_commType == COMM_FIXED_BLOCKING || m_commType == COMM_FIXED_NONBLOCKING)
+        std::cout << " | " << std::setw(14) << " Avg. RTT";
+
+    std::cout << " | " << std::setw(25) << "Throughput"
+              << " | " << std::setw(10) << " Errors"
+              << std::endl;
+
+    std::cout << std::right << std::setw(7) << m_currentPhase
+              << " | " << std::setw(7) << ruId
+              << " | " << std::setw(7) << buId;
+
+    if (m_commType == COMM_FIXED_BLOCKING || m_commType == COMM_FIXED_NONBLOCKING)
+        std::cout << " | " << std::setw(12) << averageRtt << " s";
+
+    std::cout << " | " << std::setw(18) << std::fixed << std::setprecision(2) << throughput << " Mbit/s"
+              << " | " << std::setw(10) << errors << std::endl
+              << std::endl;
+
+    // logging
+    std::ofstream outputFile(m_phasesFilepath, std::ios::app);
+    if (outputFile.is_open())
+    {
+        outputFile.seekp(0, std::ios::end);
+        if (outputFile.tellp() == 0)
+        {
+            outputFile << "timestamp,comm_type,message_size,phase,ru,bu,avg_rtt,throughput,errors\n"; // File is empty, add the header
+        }
+
+        std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+
+        outputFile << std::put_time(std::localtime(&now), "%Y-%m-%d %H:%M:%S") << ","
+                   << communicationTypeToString(m_commType) << ","
+                   << messageSizeToString(m_commType, m_messageSize) << ","
+                   << m_currentPhase << ","
+                   << ruId << ","
+                   << buId << ","
+                   << averageRtt << ","
+                   << throughput << ","
+                   << errors << "\n";
+
+        outputFile.close();
+    }
+    else
+    {
+        std::cerr << "Failed to open file: " << m_phasesFilepath << std::endl;
     }
 }
 
@@ -334,7 +392,17 @@ void ContinuousBenchmark::run()
                 timespec elapsedTime = diff(startTime, endTime);
                 currentRunTimeDiff = elapsedTime.tv_sec + (elapsedTime.tv_nsec / 1e9);
 
-                printIterationInfo(currentRunTimeDiff, ruId, buId, transferredSize, errorMessageCount);
+                double avgThroughput = (transferredSize * 8.0) / (currentRunTimeDiff * 1e6);
+
+                if (m_commType == COMM_VARIABLE_BLOCKING || m_commType == COMM_VARIABLE_NONBLOCKING)
+                {
+                    performPhaseLogging(ruId, buId, avgThroughput, errorMessageCount);
+                }
+                else
+                {
+                    double averageRtt = currentRunTimeDiff / m_iterations;
+                    performPhaseLogging(ruId, buId, avgThroughput, errorMessageCount, averageRtt);
+                }
 
                 result = std::make_pair(0, 0);
             }

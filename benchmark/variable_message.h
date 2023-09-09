@@ -13,8 +13,6 @@ public:
 
 private:
     void initMessageSizes();
-    void printIterationInfo(double elapsedSecs, std::string &ruId, std::string &buId,
-                            std::size_t transferredSize, std::size_t errorMessagesCount) override;
     void parseArguments(std::vector<ArgumentEntry> args) override;
 
     std::size_t m_messageSizeVariants = 100;

@@ -175,30 +175,38 @@ std::string getCurrentDate()
     return oss.str();
 }
 
-bool directoryExists(const std::string& path) {
+bool directoryExists(const std::string &path)
+{
     struct stat info;
     return stat(path.c_str(), &info) == 0 && S_ISDIR(info.st_mode);
 }
 
-const std::string createLogFilepath(std::string baseDirectory)
+const std::string createLogFilepath(std::string baseDirectory, int rank)
 {
     std::string parentDirectory = "logs";
     std::string logDirFilepath = parentDirectory + "/" + baseDirectory;
     std::string logFilepath = logDirFilepath + "/" + getCurrentDate() + ".csv";
 
-    if (!directoryExists(parentDirectory)) {
-        if (mkdir(parentDirectory.c_str(), 0777) != 0) {
-            std::cerr << "Error creating parent directory: " << parentDirectory << std::endl;
-            MPI_Finalize();
-            std::exit(1);
+    if (rank == 0)
+    {
+        if (!directoryExists(parentDirectory))
+        {
+            if (mkdir(parentDirectory.c_str(), 0777) != 0)
+            {
+                std::cerr << "Error creating parent directory: " << parentDirectory << std::endl;
+                MPI_Finalize();
+                std::exit(1);
+            }
         }
-    }
 
-    if (!directoryExists(logDirFilepath)) {
-        if (mkdir(logDirFilepath.c_str(), 0777) != 0) {
-            std::cerr << "Error creating directory: " << logDirFilepath << std::endl;
-            MPI_Finalize();
-            std::exit(1);
+        if (!directoryExists(logDirFilepath))
+        {
+            if (mkdir(logDirFilepath.c_str(), 0777) != 0)
+            {
+                std::cerr << "Error creating directory: " << logDirFilepath << std::endl;
+                MPI_Finalize();
+                std::exit(1);
+            }
         }
     }
 
@@ -245,12 +253,10 @@ int main(int argc, char **argv)
         MPI_Finalize();
         return 1;
     }
-    if (rank == 0)
-    {
-        benchmark->setPhasesFilepath(createLogFilepath("phases"));
-        benchmark->setAvgThroughputFilepath(createLogFilepath("avg_throughput"));
-        benchmark->setAvgBwFilepath(createLogFilepath("avg_bw"));
-    }
+
+    benchmark->setPhasesFilepath(createLogFilepath("phases", rank));
+    benchmark->setAvgThroughputFilepath(createLogFilepath("avg_throughput", rank));
+    benchmark->setAvgBwFilepath(createLogFilepath("avg_bw", rank));
 
     std::signal(SIGINT, [](int signal)
                 { handleSignals(signal); });

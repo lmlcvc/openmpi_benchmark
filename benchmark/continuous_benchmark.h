@@ -20,9 +20,9 @@ public:
 
 protected:
     void initUnitLists();
-    virtual void printIterationInfo(double elapsedSecs, std::string &ruId, std::string &buId,
-                                    std::size_t transferredSize, std::size_t errorMessagesCount) = 0;
     void findCommPairs(std::vector<std::pair<UnitInfo, UnitInfo>> &pairs);
+    void performPhaseLogging(std::string ruId, std::string buId,
+                             double throughput, std::size_t errors, double averageRtt);
     void performPeriodicalLogging(std::size_t transferredSize, double currentRunTimeDiff, timespec endTime);
     void handleAverageThroughput();
 
