@@ -19,8 +19,10 @@
 #include <cstring>
 #include <algorithm>
 #include <functional>
+#include <string>
 
 #include "../communication/communication_interface.h"
+#include "../unit/unit.h"
 
 struct ArgumentEntry
 {
@@ -43,37 +45,38 @@ class Benchmark : public CommunicationInterface
 public:
     virtual ~Benchmark() {}
     virtual void run() = 0;
+    virtual void performWarmup() = 0;
 
-    void performWarmup();
+    const std::string getPhasesFilepath() { return m_phasesFilepath; }
+    void setPhasesFilepath(std::string path) { m_phasesFilepath = path; }
+
+    const std::string getAvgThroughputFilepath() { return m_avgThroughputFilepath; }
+    void setAvgThroughputFilepath(std::string path) { m_avgThroughputFilepath = path; }
+
+    const std::string getAvgBwFilepath() { return m_avgBwFilepath; }
+    void setAvgBwFilepath(std::string path) { m_avgBwFilepath = path; }
 
 protected:
     timespec diff(timespec start, timespec end);
     std::vector<std::pair<int, int>> findSubarrayIndices(std::size_t messageSize);
     std::pair<double, double> calculateThroughput(timespec startTime, timespec endTime, std::size_t bytesTransferred, std::size_t iterations);
 
-    void allocateMemory();
+    virtual void warmupCommunication(std::vector<std::pair<int, int>> subarrayIndices, int ruRank, int buRank) = 0;
     virtual void parseArguments(std::vector<ArgumentEntry> args) = 0;
-
-    virtual void warmupCommunication(std::vector<std::pair<int, int>> subarrayIndices, int8_t rank);
 
     int m_rank;
 
-    std::size_t m_iterations = 1e5;       // communication steps to be printed
+    std::size_t m_iterations = 1e4;       // communication steps to be printed
     std::size_t m_warmupIterations = 100; // iteration count for warmup-related throughput calculation
     std::size_t m_syncIterations = 1e4;
 
-    const std::size_t m_minIterations = 1e5;
+    const std::size_t m_minIterations = 1e4;
 
     typedef std::unique_ptr<void, std::function<void(void *)>> buffer_t;
 
-    buffer_t m_memSndPtr;
-    buffer_t m_memRcvPtr;
-
-    std::size_t m_sndBufferBytes = 1e7;
-    std::size_t m_rcvBufferBytes = 1e7;
-
-    int8_t *m_bufferSnd;
-    int8_t *m_bufferRcv;
+    std::string m_phasesFilepath;
+    std::string m_avgThroughputFilepath;
+    std::string m_avgBwFilepath;
 };
 
 #endif // BENCHMARK_H

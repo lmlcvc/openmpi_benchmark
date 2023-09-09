@@ -1,47 +1,355 @@
 #include "continuous_benchmark.h"
 
-void ContinuousBenchmark::run()
+std::string getNextID(const std::string &currentID)
 {
-    timespec startTime, endTime;
-    std::size_t errorMessageCount = -1;
-    std::size_t transferredSize = -1;
+    std::string nextID = currentID;
 
-    // Reset counters
-    transferredSize = 0;
+    if (currentID.empty() || currentID.back() == 'Z')
+    {
+        nextID += 'A';
+    }
+    else
+    {
+        nextID.back() += 1;
+    }
+
+    return nextID;
+}
+
+std::string communicationTypeToString(CommunicationType commType)
+{
+    switch (commType)
+    {
+    case COMM_SCAN:
+        return "SCAN";
+    case COMM_FIXED_BLOCKING:
+        return "FIXED_BLOCKING";
+    case COMM_FIXED_NONBLOCKING:
+        return "FIXED_NONBLOCKING";
+    case COMM_VARIABLE_BLOCKING:
+        return "VARIABLE_BLOCKING";
+    case COMM_VARIABLE_NONBLOCKING:
+        return "VARIABLE_NONBLOCKING";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+std::string messageSizeToString(CommunicationType commType, std::size_t messageSize)
+{
+    if (commType == COMM_VARIABLE_BLOCKING || commType == COMM_VARIABLE_NONBLOCKING)
+    {
+        return "VARIABLE";
+    }
+    return std::to_string(messageSize);
+}
+
+void ContinuousBenchmark::initUnitLists()
+{
+    UnitInfo tmpInfo;
+    std::string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    std::string currentID = "A";
+
+    for (std::size_t i = 0; i < m_nodesCount; i++)
+    {
+        tmpInfo.rank = i;
+        if (i < m_nodesCount / 2)
+        {
+            tmpInfo.id = std::to_string(i + 1);
+            m_readoutUnits.push_back(tmpInfo);
+
+            if (m_rank == i)
+                m_unit->setBufferBytes(m_ruBufferBytes);
+        }
+        else
+        {
+            tmpInfo.id = currentID;
+            m_builderUnits.push_back(tmpInfo);
+
+            currentID = getNextID(currentID);
+
+            if (m_rank == i)
+                m_unit->setBufferBytes(m_buBufferBytes);
+        }
+    }
+
+    if (m_rank == 0)
+    {
+        std::cout << "RUs:" << std::endl;
+        for (const auto &unit : m_readoutUnits)
+        {
+            std::cout << "Rank: " << unit.rank << ", ID: " << unit.id << std::endl;
+        }
+
+        std::cout << "\nBUs:" << std::endl;
+        for (const auto &unit : m_builderUnits)
+        {
+            std::cout << "Rank: " << unit.rank << ", ID: " << unit.id << std::endl;
+        }
+    }
+}
+
+void ContinuousBenchmark::findCommPairs(std::vector<std::pair<UnitInfo, UnitInfo>> &pairs)
+{
+    for (int i = 0; i < m_readoutUnits.size(); i++)
+    {
+        UnitInfo ru = m_readoutUnits.at(i);
+
+        int buRankIndex = (m_currentPhase + i) % m_builderUnits.size();
+        UnitInfo bu = m_builderUnits.at(buRankIndex);
+
+        pairs.push_back(std::make_pair(ru, bu));
+    }
+}
+
+void ContinuousBenchmark::warmupCommunication(std::vector<std::pair<int, int>> subarrayIndices, int ruRank, int buRank)
+{
+    std::size_t subarrayCount = subarrayIndices.size();
+    std::size_t subarraySize;
+
+    if (m_rank == ruRank)
+    {
+        int8_t *bufferSnd = m_unit->getBuffer();
+
+        for (std::size_t i = 0; i < m_warmupIterations; i++)
+        {
+            for (std::size_t i = 0; i < subarrayCount; i++)
+            {
+                subarraySize = subarrayIndices[i].second - subarrayIndices[i].first + 1;
+                MPI_Send(bufferSnd + subarrayIndices[i].first, subarraySize, MPI_BYTE, buRank, 0, MPI_COMM_WORLD);
+            }
+        }
+    }
+    else if (m_rank == buRank)
+    {
+        int8_t *bufferRcv = m_unit->getBuffer();
+
+        for (std::size_t i = 0; i < m_warmupIterations; i++)
+        {
+            for (std::size_t i = 0; i < subarrayCount; i++)
+            {
+                subarraySize = subarrayIndices[i].second - subarrayIndices[i].first + 1;
+                MPI_Recv(bufferRcv + subarrayIndices[i].first, subarraySize, MPI_BYTE, ruRank, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            }
+        }
+    }
+}
+
+void ContinuousBenchmark::performWarmup()
+{
+    int buRank;
+    timespec startTime, endTime;
+    double throughput;
+    const std::size_t bufferBytes = m_unit->getBufferBytes();
+    std::size_t messageSize = bufferBytes / 10;
+    std::size_t transferredSize = 0;
+
+    std::vector<std::pair<int, int>> subarrayIndices = findSubarrayIndices(bufferBytes);
+
     clock_gettime(CLOCK_MONOTONIC, &startTime);
 
-    if (m_commType == COMM_FIXED_BLOCKING)
+    for (int ruRank = 0; ruRank < m_nodesCount; ruRank++)
     {
-        std::pair<std::size_t, std::size_t> result = CommunicationInterface::blockingCommunication(m_bufferSnd, m_bufferRcv, m_sndBufferBytes, m_rcvBufferBytes,
-                                                                                                   m_messageSize, m_rank, m_iterations);
-        errorMessageCount = result.first;
-        transferredSize = result.second;
-    }
-    else if (m_commType == COMM_FIXED_NONBLOCKING)
-    {
-        std::pair<std::size_t, std::size_t> result = CommunicationInterface::nonBlockingCommunication(m_bufferSnd, m_bufferRcv, m_sndBufferBytes, m_rcvBufferBytes,
-                                                                                                   m_messageSize, m_rank, m_iterations, m_syncIterations);
-        errorMessageCount = result.first;
-        transferredSize = result.second;
-    }
-    else if (m_commType == COMM_VARIABLE_BLOCKING)
-    {
-        std::pair<std::size_t, std::size_t> result = CommunicationInterface::variableBlockingCommunication(m_bufferSnd, m_bufferRcv,
-                                                                                                           m_sndBufferBytes, m_rcvBufferBytes,
-                                                                                                           m_messageSizes, m_rank, m_iterations);
-        errorMessageCount = result.first;
-        transferredSize = result.second;
-    }
-
-    else if (m_commType == COMM_VARIABLE_NONBLOCKING)
-    {
-        std::pair<std::size_t, std::size_t> result = CommunicationInterface::blockingCommunication(m_bufferSnd, m_bufferRcv, m_sndBufferBytes, m_rcvBufferBytes,
-                                                                                                   m_messageSize, m_rank, m_iterations);
-        errorMessageCount = result.first;
-        transferredSize = result.second;
+        buRank = (1 + ruRank) % m_nodesCount;
+        if (m_rank == ruRank || m_rank == buRank)
+        {
+            std::pair<std::size_t, std::size_t> result = CommunicationInterface::blockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
+                                                                                                       messageSize, m_warmupIterations);
+            transferredSize += result.second;
+        }
     }
 
     clock_gettime(CLOCK_MONOTONIC, &endTime);
+    std::tie(std::ignore, throughput) = calculateThroughput(startTime, endTime, transferredSize, m_warmupIterations);
 
-    printIterationInfo(startTime, endTime, transferredSize, errorMessageCount);
+    if (m_rank == 0)
+        std::cout << "\nAvg. pre-warmup throughput: " << throughput << " Mbit/s" << std::endl
+                  << "Performing warmup...";
+
+    for (int ruRank = 0; ruRank < m_nodesCount; ruRank++)
+    {
+        buRank = (1 + ruRank) % m_nodesCount;
+        if (m_rank == ruRank || m_rank == buRank)
+            warmupCommunication(subarrayIndices, ruRank, buRank);
+    }
+
+    if (m_rank == 0)
+        std::cout << "Done." << std::endl;
+
+    transferredSize = 0;
+    clock_gettime(CLOCK_MONOTONIC, &startTime);
+
+    for (int ruRank = 0; ruRank < m_nodesCount; ruRank++)
+    {
+        buRank = (1 + ruRank) % m_nodesCount;
+        if (m_rank == ruRank || m_rank == buRank)
+        {
+            std::pair<std::size_t, std::size_t> result = CommunicationInterface::blockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
+                                                                                                       messageSize, m_warmupIterations);
+            transferredSize += result.second;
+        }
+    }
+    clock_gettime(CLOCK_MONOTONIC, &endTime);
+
+    std::tie(std::ignore, throughput) = calculateThroughput(startTime, endTime, transferredSize, m_warmupIterations);
+
+    if (m_rank == 0)
+        std::cout << "Avg. post-warmup throughput: " << throughput << " Mbit/s\n"
+                  << std::endl;
+}
+
+void ContinuousBenchmark::handleAverageThroughput()
+{
+    double avgThroughput = (m_totalTransferredSize * 8.0) / (m_totalElapsedTime * 1e6);
+
+    std::cout << std::fixed << std::setprecision(2);
+
+    std::cout << "Average throughput in " << m_lastAvgCalculationInterval << "s: " << avgThroughput << " Mbit/s" << std::endl
+              << std::endl;
+
+    std::ofstream outputFile(m_avgThroughputFilepath, std::ios::app);
+    if (outputFile.is_open())
+    {
+        outputFile.seekp(0, std::ios::end);
+        if (outputFile.tellp() == 0)
+        {
+            outputFile << "timestamp,comm_type,message_size,throughput\n"; // File is empty, add the header
+        }
+
+        std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+
+        outputFile << std::put_time(std::localtime(&now), "%Y-%m-%d %H:%M:%S") << ","
+                   << communicationTypeToString(m_commType) << ","
+                   << messageSizeToString(m_commType, m_messageSize) << ","
+                   << avgThroughput << "\n";
+
+        outputFile.close();
+    }
+    else
+    {
+        std::cerr << "Failed to open file: " << m_avgThroughputFilepath << std::endl;
+    }
+}
+
+void ContinuousBenchmark::performPeriodicalLogging(std::size_t transferredSize, double currentRunTimeDiff, timespec endTime)
+{
+    timespec lastAvgCalculationDiff = diff(m_lastAvgCalculationTime, endTime);
+    double secsFromLastAvg = lastAvgCalculationDiff.tv_sec + (lastAvgCalculationDiff.tv_nsec / 1e9);
+    if (secsFromLastAvg >= m_lastAvgCalculationInterval) // TODO: -1 if off
+    {
+        if (m_rank == 0)
+            handleAverageThroughput();
+        m_totalTransferredSize = 0;
+        m_totalElapsedTime = 0.0;
+        clock_gettime(CLOCK_MONOTONIC, &m_lastAvgCalculationTime);
+    }
+    else
+    {
+        std::size_t tmpTransferredSize = 0;
+        double tmpElapsedTime = 0.0;
+
+        for (const auto &unit : m_builderUnits)
+        {
+            int buRank = unit.rank;
+
+            if (m_rank == buRank && m_rank != 0)
+            {
+                MPI_Send(&transferredSize, 1, MPI_UNSIGNED_LONG_LONG, 0, 0, MPI_COMM_WORLD);
+                MPI_Send(&currentRunTimeDiff, 1, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
+            }
+            else if (m_rank == 0)
+            {
+                MPI_Recv(&tmpTransferredSize, 1, MPI_UNSIGNED_LONG_LONG, buRank, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                MPI_Recv(&tmpElapsedTime, 1, MPI_DOUBLE, buRank, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+                m_totalTransferredSize += tmpTransferredSize;
+                m_totalElapsedTime += tmpElapsedTime;
+            }
+        }
+        if (m_rank == 0) // case when 0 is one of the BUs
+        {
+            m_totalTransferredSize += transferredSize;
+            m_totalElapsedTime += currentRunTimeDiff;
+        }
+    }
+}
+
+void ContinuousBenchmark::run()
+{
+    int ruRank, buRank;
+    std::string ruId, buId;
+
+    timespec startTime, endTime;
+
+    std::size_t errorMessageCount = 0;
+    std::size_t transferredSize = 0;
+    double currentRunTimeDiff = 0.0;
+
+    std::pair<std::size_t, std::size_t> result = std::make_pair(0, 0);
+
+    std::vector<std::pair<UnitInfo, UnitInfo>> pairs;
+    findCommPairs(pairs);
+
+    for (const auto &pair : pairs)
+    {
+        ruRank = pair.first.rank;
+        buRank = pair.second.rank;
+
+        ruId = pair.first.id;
+        buId = pair.second.id;
+
+        clock_gettime(CLOCK_MONOTONIC, &startTime);
+        if (m_rank == ruRank || m_rank == buRank)
+        {
+            transferredSize = 0;
+
+            if (m_commType == COMM_FIXED_BLOCKING)
+            {
+                result = CommunicationInterface::blockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
+                                                                       m_messageSize, m_iterations);
+            }
+            else if (m_commType == COMM_FIXED_NONBLOCKING)
+            {
+                result = CommunicationInterface::nonBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
+                                                                          m_messageSize, m_iterations, m_syncIterations);
+            }
+            else if (m_commType == COMM_VARIABLE_BLOCKING)
+            {
+                result = CommunicationInterface::variableBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
+                                                                               m_messageSizes, m_iterations);
+            }
+            else if (m_commType == COMM_VARIABLE_NONBLOCKING)
+            {
+                result = CommunicationInterface::variableNonBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
+                                                                                  m_messageSizes, m_iterations, m_syncIterations);
+            }
+
+            // perform logging and reset result variable
+            clock_gettime(CLOCK_MONOTONIC, &endTime);
+            if (m_rank == buRank)
+            {
+                errorMessageCount = result.first;
+                transferredSize = result.second;
+
+                timespec elapsedTime = diff(startTime, endTime);
+                currentRunTimeDiff = elapsedTime.tv_sec + (elapsedTime.tv_nsec / 1e9);
+
+                printIterationInfo(currentRunTimeDiff, ruId, buId, transferredSize, errorMessageCount);
+
+                result = std::make_pair(0, 0);
+            }
+            else if (m_rank == ruRank)
+            {
+                result = std::make_pair(0, 0);
+            }
+        }
+        else
+            continue;
+    }
+
+    m_currentPhase++;
+
+    performPeriodicalLogging(transferredSize, currentRunTimeDiff, endTime);
+
+    MPI_Barrier(MPI_COMM_WORLD);
 }

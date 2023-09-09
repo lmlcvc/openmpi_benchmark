@@ -1,32 +1,52 @@
 #include "variable_message.h"
 
-BenchmarkVariableMessage::BenchmarkVariableMessage(std::vector<ArgumentEntry> args, int rank, CommunicationType commType)
+BenchmarkVariableMessage::BenchmarkVariableMessage(std::vector<ArgumentEntry> args, int rank, int size, CommunicationType commType)
 {
     m_rank = rank;
+    m_nodesCount = size;
     m_commType = commType;
 
-    parseArguments(args);
+    m_unit = std::make_unique<Unit>(rank);
+
+    BenchmarkVariableMessage::parseArguments(args);
+
+    m_syncIterations = m_iterations / 1e4;
+
+    initUnitLists();
+    m_unit->allocateMemory();
 
     initMessageSizes();
-
-    allocateMemory();
 
     if (m_rank == 0)
     {
         std::cout << std::endl
-                  << "Performing variable size benchmark." << std::endl
-                  << "Available sizes: " << m_messageSizeVariants << " (range: 10000 B - " << m_sndBufferBytes << " B)" << std::endl;
+                  << "Performing variable size benchmark. "
+                  << std::endl;
+
+        if (commType == COMM_VARIABLE_BLOCKING)
+        {
+            std::cout << "Blocking communication." << std::endl
+                      << std::endl;
+        }
+        else if (commType == COMM_VARIABLE_NONBLOCKING)
+        {
+            std::cout << "Non-blocking communication." << std::endl
+                      << std::endl;
+        }
+        std::cout << "Available sizes: " << m_messageSizeVariants << " (range: 10000 B - " << m_ruBufferBytes << " B)" << std::endl;
 
         std::cout << std::endl
-                  << std::left << std::setw(20) << "Send buffer size:"
-                  << std::right << std::setw(10) << m_sndBufferBytes << " B" << std::endl;
+                  << std::left << std::setw(20) << "RU buffer size:"
+                  << std::right << std::setw(10) << m_ruBufferBytes << " B" << std::endl;
 
-        std::cout << std::left << std::setw(20) << "Receive buffer size:"
-                  << std::right << std::setw(10) << m_rcvBufferBytes << " B" << std::endl;
+        std::cout << std::left << std::setw(20) << "BU buffer size:"
+                  << std::right << std::setw(10) << m_buBufferBytes << " B" << std::endl;
 
         std::cout << std::left << std::setw(20) << "Number of iterations:"
                   << std::right << std::setw(9) << m_iterations << std::endl;
     }
+
+    clock_gettime(CLOCK_MONOTONIC, &m_lastAvgCalculationTime);
 }
 
 void BenchmarkVariableMessage::parseArguments(std::vector<ArgumentEntry> args)
@@ -36,13 +56,15 @@ void BenchmarkVariableMessage::parseArguments(std::vector<ArgumentEntry> args)
     {
         switch (entry.option)
         {
-        case 'b':
-            tmp = std::stoul(entry.value);
-            m_sndBufferBytes = (tmp > 0) ? tmp : m_sndBufferBytes;
-            break;
         case 'r':
             tmp = std::stoul(entry.value);
-            m_rcvBufferBytes = (tmp > 0) ? tmp : m_rcvBufferBytes;
+            if (tmp > 0)
+                m_ruBufferBytes = tmp;
+            break;
+        case 'b':
+            tmp = std::stoul(entry.value);
+            if (tmp > 0)
+                m_buBufferBytes = tmp;
             break;
         case 'm':
             tmp = std::stoul(entry.value);
@@ -50,11 +72,15 @@ void BenchmarkVariableMessage::parseArguments(std::vector<ArgumentEntry> args)
             break;
         case 'i':
             tmp = std::stoul(entry.value);
-            m_iterations = (tmp > m_minIterations) ? tmp : m_iterations;
+            m_iterations = (tmp >= m_minIterations) ? tmp : m_iterations;
             break;
         case 'w':
             tmp = std::stoul(entry.value);
             m_warmupIterations = (tmp > 0) ? tmp : m_warmupIterations;
+            break;
+        case 'l':
+            tmp = std::stoul(entry.value);
+            m_lastAvgCalculationInterval = (tmp > 0) ? tmp : m_lastAvgCalculationInterval;
             break;
         default:
             if (m_rank == 0)
@@ -73,7 +99,7 @@ void BenchmarkVariableMessage::initMessageSizes()
     std::mt19937 generator(seed);
 
     std::size_t lowerBound = 1e4;
-    std::size_t upperBound = m_sndBufferBytes;
+    std::size_t upperBound = m_ruBufferBytes;
 
     if (upperBound < lowerBound)
     {
@@ -93,23 +119,24 @@ void BenchmarkVariableMessage::initMessageSizes()
     }
 }
 
-void BenchmarkVariableMessage::printIterationInfo(timespec startTime, timespec endTime, std::size_t transferredSize, std::size_t errorMessagesCount)
+void BenchmarkVariableMessage::printIterationInfo(double elapsedSecs, std::string &ruId, std::string &buId,
+                                                  std::size_t transferredSize, std::size_t errorMessagesCount)
 {
-    if (m_rank)
-        return;
-
-    timespec elapsedTime = diff(startTime, endTime);
-    double elapsedSecs = elapsedTime.tv_sec + (elapsedTime.tv_nsec / 1e9);
-
     double avgThroughput = (transferredSize * 8.0) / (elapsedSecs * 1e6);
 
     std::cout << std::fixed << std::setprecision(8);
 
-    std::cout << std::right << std::setw(25) << "Throughput"
+    std::cout << std::right << std::setw(7) << "Phase"
+              << " | " << std::setw(7) << "RU"
+              << " | " << std::setw(7) << "BU"
+              << " | " << std::setw(25) << "Throughput"
               << " | " << std::setw(10) << " Errors"
               << std::endl;
 
-    std::cout << std::right << std::setw(18) << std::fixed << std::setprecision(2) << avgThroughput << " Mbit/s"
+    std::cout << std::right << std::setw(7) << m_currentPhase
+              << " | " << std::setw(7) << ruId
+              << " | " << std::setw(7) << buId
+              << " | " << std::setw(18) << std::fixed << std::setprecision(2) << avgThroughput << " Mbit/s"
               << " | " << std::setw(10) << errorMessagesCount << std::endl
               << std::endl;
 }
