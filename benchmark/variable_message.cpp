@@ -8,7 +8,7 @@ BenchmarkVariableMessage::BenchmarkVariableMessage(std::vector<ArgumentEntry> ar
 
     m_unit = std::make_unique<Unit>(rank);
 
-    parseArguments(args);
+    BenchmarkVariableMessage::parseArguments(args);
 
     m_syncIterations = m_iterations / 1e4;
 
@@ -45,6 +45,8 @@ BenchmarkVariableMessage::BenchmarkVariableMessage(std::vector<ArgumentEntry> ar
         std::cout << std::left << std::setw(20) << "Number of iterations:"
                   << std::right << std::setw(9) << m_iterations << std::endl;
     }
+
+    clock_gettime(CLOCK_MONOTONIC, &m_lastAvgCalculationTime);
 }
 
 void BenchmarkVariableMessage::parseArguments(std::vector<ArgumentEntry> args)
@@ -70,11 +72,15 @@ void BenchmarkVariableMessage::parseArguments(std::vector<ArgumentEntry> args)
             break;
         case 'i':
             tmp = std::stoul(entry.value);
-            m_iterations = (tmp > m_minIterations) ? tmp : m_iterations;
+            m_iterations = (tmp >= m_minIterations) ? tmp : m_iterations;
             break;
         case 'w':
             tmp = std::stoul(entry.value);
             m_warmupIterations = (tmp > 0) ? tmp : m_warmupIterations;
+            break;
+        case 'l':
+            tmp = std::stoul(entry.value);
+            m_lastAvgCalculationInterval = (tmp > 0) ? tmp : m_lastAvgCalculationInterval;
             break;
         default:
             if (m_rank == 0)
@@ -113,12 +119,9 @@ void BenchmarkVariableMessage::initMessageSizes()
     }
 }
 
-void BenchmarkVariableMessage::printIterationInfo(timespec startTime, timespec endTime, std::string& ruId, std::string& buId,
+void BenchmarkVariableMessage::printIterationInfo(double elapsedSecs, std::string &ruId, std::string &buId,
                                                   std::size_t transferredSize, std::size_t errorMessagesCount)
 {
-    timespec elapsedTime = diff(startTime, endTime);
-    double elapsedSecs = elapsedTime.tv_sec + (elapsedTime.tv_nsec / 1e9);
-
     double avgThroughput = (transferredSize * 8.0) / (elapsedSecs * 1e6);
 
     std::cout << std::fixed << std::setprecision(8);

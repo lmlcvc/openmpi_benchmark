@@ -5,6 +5,11 @@
 #include <string>
 #include <memory>
 #include <mpi.h>
+#include <fstream>
+#include <sstream>
+#include <iomanip>
+#include <ctime>
+#include <sys/stat.h>
 
 #include "benchmark/benchmark.h"
 #include "benchmark/scan_benchmark.h"
@@ -46,7 +51,8 @@ void printHelp()
     std::cout << "    -i <iterations>          Specify the number of iterations.\n";
     std::cout << "    -r <RU buffer bytes>     Set the size of the send buffer in bytes.\n";
     std::cout << "    -b <BU buffer bytes>     Set the size of the receive buffer in bytes.\n";
-    std::cout << "    -w <warmup iterations>   Set the number of warmup iterations.\n\n";
+    std::cout << "    -w <warmup iterations>   Set the number of warmup iterations.\n";
+    std::cout << "    -l <logging interval>    Set the interval for average throughput logging in seconds.\n\n";
 
     std::cout << "  VARIABLE MESSAGE SIZE RUN:\n";
     std::cout << "    -v                         Perform a run with variable message sizes.\n";
@@ -55,6 +61,7 @@ void printHelp()
     std::cout << "    -r <RU buffer bytes>       Set the size of the send buffer in bytes.\n";
     std::cout << "    -b <BU buffer bytes>       Set the size of the receive buffer in bytes.\n";
     std::cout << "    -w <warmup iterations>     Set the number of warmup iterations.\n";
+    std::cout << "    -l <logging interval>    Set the interval for average throughput logging in seconds.\n\n";
 }
 
 timespec diff(timespec start, timespec end)
@@ -87,7 +94,7 @@ void parseArguments(int argc, char **argv, int rank, CommunicationType &commType
 {
     int opt;
     bool nonblocking = false;
-    while ((opt = getopt(argc, argv, "m:i:b:w:sfvr:nh")) != -1)
+    while ((opt = getopt(argc, argv, "m:i:b:w:sfvr:l:nh")) != -1)
     {
         switch (opt)
         {
@@ -136,6 +143,7 @@ void parseArguments(int argc, char **argv, int rank, CommunicationType &commType
         case 'r':
         case 'w':
         case 'p':
+        case 'l':
             commArguments.push_back({static_cast<char>(opt), optarg});
             break;
         case 'h':
@@ -155,6 +163,46 @@ void parseArguments(int argc, char **argv, int rank, CommunicationType &commType
         if (commType == COMM_FIXED_BLOCKING)
             commType = COMM_FIXED_NONBLOCKING;
     }
+}
+
+std::string getCurrentDate()
+{
+    std::time_t t = std::time(nullptr);
+    std::tm tm = *std::localtime(&t);
+
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "%Y-%m-%d");
+    return oss.str();
+}
+
+bool directoryExists(const std::string& path) {
+    struct stat info;
+    return stat(path.c_str(), &info) == 0 && S_ISDIR(info.st_mode);
+}
+
+const std::string createLogFilepath(std::string baseDirectory)
+{
+    std::string parentDirectory = "logs";
+    std::string logDirFilepath = parentDirectory + "/" + baseDirectory;
+    std::string logFilepath = logDirFilepath + "/" + getCurrentDate() + ".csv";
+
+    if (!directoryExists(parentDirectory)) {
+        if (mkdir(parentDirectory.c_str(), 0777) != 0) {
+            std::cerr << "Error creating parent directory: " << parentDirectory << std::endl;
+            MPI_Finalize();
+            std::exit(1);
+        }
+    }
+
+    if (!directoryExists(logDirFilepath)) {
+        if (mkdir(logDirFilepath.c_str(), 0777) != 0) {
+            std::cerr << "Error creating directory: " << logDirFilepath << std::endl;
+            MPI_Finalize();
+            std::exit(1);
+        }
+    }
+
+    return logFilepath;
 }
 
 int main(int argc, char **argv)
@@ -197,6 +245,12 @@ int main(int argc, char **argv)
         MPI_Finalize();
         return 1;
     }
+    if (rank == 0)
+    {
+        benchmark->setPhasesFilepath(createLogFilepath("phases"));
+        benchmark->setAvgThroughputFilepath(createLogFilepath("avg_throughput"));
+        benchmark->setAvgBwFilepath(createLogFilepath("avg_bw"));
+    }
 
     std::signal(SIGINT, [](int signal)
                 { handleSignals(signal); });
@@ -204,6 +258,7 @@ int main(int argc, char **argv)
     // Run program
     clock_gettime(CLOCK_MONOTONIC, &runStartTime);
     benchmark->performWarmup();
+
     do
     {
         benchmark->run();

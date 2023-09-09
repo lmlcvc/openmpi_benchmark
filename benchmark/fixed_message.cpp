@@ -52,6 +52,8 @@ BenchmarkFixedMessage::BenchmarkFixedMessage(std::vector<ArgumentEntry> args, in
         std::cout << std::left << std::setw(20) << "Number of iterations:"
                   << std::right << std::setw(9) << m_iterations << std::endl;
     }
+
+    clock_gettime(CLOCK_MONOTONIC, &m_lastAvgCalculationTime);
 }
 
 void BenchmarkFixedMessage::parseArguments(std::vector<ArgumentEntry> args)
@@ -77,11 +79,16 @@ void BenchmarkFixedMessage::parseArguments(std::vector<ArgumentEntry> args)
             break;
         case 'i':
             tmp = std::stoul(entry.value);
-            m_iterations = (tmp > m_minIterations) ? tmp : m_iterations;
+            std::cout << entry.value << std::endl;
+            m_iterations = tmp; // (tmp >= m_minIterations) ? tmp : m_iterations;
             break;
         case 'w':
             tmp = std::stoul(entry.value);
             m_warmupIterations = (tmp > 0) ? tmp : m_warmupIterations;
+            break;
+        case 'l':
+            tmp = std::stoul(entry.value);
+            m_lastAvgCalculationInterval = (tmp > 0) ? tmp : m_lastAvgCalculationInterval;
             break;
         default:
             if (m_rank == 0)
@@ -94,12 +101,9 @@ void BenchmarkFixedMessage::parseArguments(std::vector<ArgumentEntry> args)
     }
 }
 
-void BenchmarkFixedMessage::printIterationInfo(timespec startTime, timespec endTime, std::string& ruId, std::string& buId,
+void BenchmarkFixedMessage::printIterationInfo(double elapsedSecs, std::string &ruId, std::string &buId,
                                                std::size_t transferredSize, std::size_t errorMessagesCount)
 {
-    timespec elapsedTime = diff(startTime, endTime);
-    double elapsedSecs = elapsedTime.tv_sec + (elapsedTime.tv_nsec / 1e9);
-
     double avgRtt = elapsedSecs / m_iterations;
     double avgThroughput = (transferredSize * 8.0) / (elapsedSecs * 1e6);
 
@@ -115,7 +119,7 @@ void BenchmarkFixedMessage::printIterationInfo(timespec startTime, timespec endT
 
     std::cout << std::right << std::setw(7) << m_currentPhase
               << " | " << std::setw(7) << ruId
-              << " | " << std::setw(7) << buId // FIXME: not printing
+              << " | " << std::setw(7) << buId
               << " | " << std::setw(12) << avgRtt << " s"
               << " | " << std::setw(11) << std::fixed << std::setprecision(2) << avgThroughput << " Mbit/s"
               << " | " << std::setw(10) << errorMessagesCount << std::endl

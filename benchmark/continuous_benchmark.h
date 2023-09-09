@@ -1,6 +1,8 @@
 #ifndef CONTINUOUSBENCHMARK_H
 #define CONTINUOUSBENCHMARK_H
 
+#include <fstream>
+
 #include "benchmark.h"
 
 struct UnitInfo
@@ -18,8 +20,11 @@ public:
 
 protected:
     void initUnitLists();
-    virtual void printIterationInfo(timespec startTime, timespec endTime, std::string& ruId, std::string& buId,
+    virtual void printIterationInfo(double elapsedSecs, std::string &ruId, std::string &buId,
                                     std::size_t transferredSize, std::size_t errorMessagesCount) = 0;
+    void findCommPairs(std::vector<std::pair<UnitInfo, UnitInfo>> &pairs);
+    void performPeriodicalLogging(std::size_t transferredSize, double currentRunTimeDiff, timespec endTime);
+    void handleAverageThroughput();
 
     CommunicationType m_commType = COMM_UNDEFINED;
     std::size_t m_messageSize = -1;
@@ -37,6 +42,12 @@ protected:
 
     std::size_t m_ruBufferBytes = 1e7;
     std::size_t m_buBufferBytes = 1e7;
+
+    std::size_t m_totalTransferredSize = 0;
+    double m_totalElapsedTime = 0.0;
+
+    std::size_t m_lastAvgCalculationInterval = 5;
+    timespec m_lastAvgCalculationTime;
 };
 
 #endif // CONTINUOUSBENCHMARK_H
