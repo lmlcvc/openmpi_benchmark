@@ -276,9 +276,10 @@ void ContinuousBenchmark::performPhaseLogging(std::string ruId, std::string buId
                    << messageSizeToString(m_commType, m_messageSize) << ","
                    << m_currentPhase << ","
                    << ruId << ","
-                   << buId << ","
-                   << averageRtt << ","
-                   << throughput << ","
+                   << buId << ",";
+        if (m_commType == COMM_FIXED_BLOCKING || m_commType == COMM_FIXED_NONBLOCKING)
+            outputFile << std::fixed << std::setprecision(8) << averageRtt;
+        outputFile << "," << std::fixed << std::setprecision(1) << throughput << ","
                    << errors << "\n";
 
         outputFile.close();
