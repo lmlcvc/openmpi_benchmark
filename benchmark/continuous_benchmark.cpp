@@ -59,7 +59,10 @@ void ContinuousBenchmark::initUnitLists()
             m_readoutUnits.push_back(tmpInfo);
 
             if (m_rank == i)
+            {
                 m_unit->setBufferBytes(m_ruBufferBytes);
+                m_unit->ruShift(m_rank);
+            }
         }
         else
         {
@@ -69,7 +72,12 @@ void ContinuousBenchmark::initUnitLists()
             currentID = getNextID(currentID);
 
             if (m_rank == i)
+            {
+                int size;
+                MPI_Comm_size(MPI_COMM_WORLD, &size);
                 m_unit->setBufferBytes(m_buBufferBytes);
+                m_unit->buShift(size % m_rank);
+            }
         }
     }
 

@@ -10,12 +10,13 @@
 #include <functional>
 #include <iostream>
 #include <unistd.h>
+#include <numeric>
 #include <mpi.h>
 
 class Unit
 {
 public:
-    Unit(int rank);
+    Unit();
     ~Unit() {}
     void allocateMemory();
 
@@ -29,6 +30,11 @@ public:
 
     int8_t *getBuffer() const { return m_buffer; }
 
+    //using shiftFunction = void (Unit::*)();
+    void ruShift(int idx);
+    void buShift(int idx);
+    //void setShiftFunction(shiftFunction func) { m_shiftFunc = func; }
+
 protected:
     int m_rank;
     std::string m_id;
@@ -38,6 +44,9 @@ protected:
     buffer_t m_memBufferPtr;
     std::size_t m_bufferBytes = 1e7;
     int8_t *m_buffer;
+
+    std::vector<int> m_shift;
+    //shiftFunction m_shiftFunc;
 };
 
 #endif // UNIT_H

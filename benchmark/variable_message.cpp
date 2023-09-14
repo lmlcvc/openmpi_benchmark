@@ -6,7 +6,7 @@ BenchmarkVariableMessage::BenchmarkVariableMessage(std::vector<ArgumentEntry> ar
     m_nodesCount = size;
     m_commType = commType;
 
-    m_unit = std::make_unique<Unit>(rank);
+    m_unit = std::make_unique<Unit>();
 
     BenchmarkVariableMessage::parseArguments(args);
 

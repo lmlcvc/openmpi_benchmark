@@ -7,7 +7,7 @@ BenchmarkFixedMessage::BenchmarkFixedMessage(std::vector<ArgumentEntry> args, in
     m_commType = commType;
     m_messageSize = 1e5;
 
-    m_unit = std::make_unique<Unit>(rank);
+    m_unit = std::make_unique<Unit>();
 
     parseArguments(args);
 
