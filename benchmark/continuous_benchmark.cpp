@@ -53,6 +53,8 @@ void ContinuousBenchmark::initUnitLists()
     for (std::size_t i = 0; i < m_nodesCount; i++)
     {
         tmpInfo.rank = i;
+
+        // RUs
         if (i < m_nodesCount / 2)
         {
             tmpInfo.id = std::to_string(i + 1);
@@ -60,10 +62,14 @@ void ContinuousBenchmark::initUnitLists()
 
             if (m_rank == i)
             {
+                m_unit->setId(tmpInfo.id);
                 m_unit->setBufferBytes(m_ruBufferBytes);
-                m_unit->ruShift(m_rank);
+                m_unit->setUnitType(UnitType::RU);
+                m_unit->ruShift(m_readoutUnits.size() -1);
             }
         }
+
+        // BUs
         else
         {
             tmpInfo.id = currentID;
@@ -73,10 +79,10 @@ void ContinuousBenchmark::initUnitLists()
 
             if (m_rank == i)
             {
-                int size;
-                MPI_Comm_size(MPI_COMM_WORLD, &size);
+                m_unit->setId(tmpInfo.id);
                 m_unit->setBufferBytes(m_buBufferBytes);
-                m_unit->buShift(size % m_rank);
+                m_unit->setUnitType(UnitType::BU);
+                m_unit->buShift(m_builderUnits.size() -1);
             }
         }
     }
@@ -94,19 +100,6 @@ void ContinuousBenchmark::initUnitLists()
         {
             std::cout << "Rank: " << unit.rank << ", ID: " << unit.id << std::endl;
         }
-    }
-}
-
-void ContinuousBenchmark::findCommPairs(std::vector<std::pair<UnitInfo, UnitInfo>> &pairs)
-{
-    for (int i = 0; i < m_readoutUnits.size(); i++)
-    {
-        UnitInfo ru = m_readoutUnits.at(i);
-
-        int buRankIndex = (m_currentPhase + i) % m_builderUnits.size();
-        UnitInfo bu = m_builderUnits.at(buRankIndex);
-
-        pairs.push_back(std::make_pair(ru, bu));
     }
 }
 
@@ -240,7 +233,7 @@ void ContinuousBenchmark::handleAverageThroughput()
     }
 }
 
-void ContinuousBenchmark::performPhaseLogging(std::string ruId, std::string buId,
+void ContinuousBenchmark::performPhaseLogging(std::string ruId, std::string buId, int phase,
                                               double throughput, std::size_t errors, double averageRtt = -1)
 {
     // printing
@@ -256,7 +249,7 @@ void ContinuousBenchmark::performPhaseLogging(std::string ruId, std::string buId
               << " | " << std::setw(10) << " Errors"
               << std::endl;
 
-    std::cout << std::right << std::setw(7) << m_currentPhase
+    std::cout << std::right << std::setw(7) << phase
               << " | " << std::setw(7) << ruId
               << " | " << std::setw(7) << buId;
 
@@ -282,7 +275,7 @@ void ContinuousBenchmark::performPhaseLogging(std::string ruId, std::string buId
         outputFile << std::put_time(std::localtime(&now), "%Y-%m-%d %H:%M:%S") << ","
                    << communicationTypeToString(m_commType) << ","
                    << messageSizeToString(m_commType, m_messageSize) << ","
-                   << m_currentPhase << ","
+                   << phase << ","
                    << ruId << ","
                    << buId << ",";
         if (m_commType == COMM_FIXED_BLOCKING || m_commType == COMM_FIXED_NONBLOCKING)
@@ -354,79 +347,79 @@ void ContinuousBenchmark::run()
 
     std::pair<std::size_t, std::size_t> result = std::make_pair(0, 0);
 
-    std::vector<std::pair<UnitInfo, UnitInfo>> pairs;
-    findCommPairs(pairs);
-
-    for (const auto &pair : pairs)
+    for (int phase = 0; phase < m_nodesCount / 2; phase++)
     {
-        ruRank = pair.first.rank;
-        buRank = pair.second.rank;
-
-        ruId = pair.first.id;
-        buId = pair.second.id;
-
-        clock_gettime(CLOCK_MONOTONIC, &startTime);
-        if (m_rank == ruRank || m_rank == buRank)
+        if (m_unit->getUnitType() == UnitType::RU)
         {
-            transferredSize = 0;
-
-            if (m_commType == COMM_FIXED_BLOCKING)
-            {
-                result = CommunicationInterface::blockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
-                                                                       m_messageSize, m_iterations);
-            }
-            else if (m_commType == COMM_FIXED_NONBLOCKING)
-            {
-                result = CommunicationInterface::nonBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
-                                                                          m_messageSize, m_iterations, m_syncIterations);
-            }
-            else if (m_commType == COMM_VARIABLE_BLOCKING)
-            {
-                result = CommunicationInterface::variableBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
-                                                                               m_messageSizes, m_iterations);
-            }
-            else if (m_commType == COMM_VARIABLE_NONBLOCKING)
-            {
-                result = CommunicationInterface::variableNonBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
-                                                                                  m_messageSizes, m_iterations, m_syncIterations);
-            }
-
-            // perform logging and reset result variable
-            clock_gettime(CLOCK_MONOTONIC, &endTime);
-            if (m_rank == buRank)
-            {
-                errorMessageCount = result.first;
-                transferredSize = result.second;
-
-                timespec elapsedTime = diff(startTime, endTime);
-                currentRunTimeDiff = elapsedTime.tv_sec + (elapsedTime.tv_nsec / 1e9);
-
-                double avgThroughput = (transferredSize * 8.0) / (currentRunTimeDiff * 1e6);
-
-                if (m_commType == COMM_VARIABLE_BLOCKING || m_commType == COMM_VARIABLE_NONBLOCKING)
-                {
-                    performPhaseLogging(ruId, buId, avgThroughput, errorMessageCount);
-                }
-                else
-                {
-                    double averageRtt = currentRunTimeDiff / m_iterations;
-                    performPhaseLogging(ruId, buId, avgThroughput, errorMessageCount, averageRtt);
-                }
-
-                result = std::make_pair(0, 0);
-            }
-            else if (m_rank == ruRank)
-            {
-                result = std::make_pair(0, 0);
-            }
+            ruRank = m_rank;
+            ruId = m_unit->getId();
+            buRank = m_builderUnits.at(m_unit->getPair(phase)).rank;
+            buId = m_builderUnits.at(m_unit->getPair(phase)).id;
         }
-        else
-            continue;
+        else if (m_unit->getUnitType() == UnitType::BU)
+        {
+            buRank = m_rank;
+            buId = m_unit->getId();
+            ruRank = m_readoutUnits.at(m_unit->getPair(phase)).rank;
+            ruId = m_readoutUnits.at(m_unit->getPair(phase)).id;
+        }
+
+        // perform communication
+        transferredSize = 0;
+        clock_gettime(CLOCK_MONOTONIC, &startTime);
+
+        if (m_commType == COMM_FIXED_BLOCKING)
+        {
+            result = CommunicationInterface::blockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
+                                                                   m_messageSize, m_iterations);
+        }
+        else if (m_commType == COMM_FIXED_NONBLOCKING)
+        {
+            result = CommunicationInterface::nonBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
+                                                                      m_messageSize, m_iterations, m_syncIterations);
+        }
+        else if (m_commType == COMM_VARIABLE_BLOCKING)
+        {
+            result = CommunicationInterface::variableBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
+                                                                           m_messageSizes, m_iterations);
+        }
+        else if (m_commType == COMM_VARIABLE_NONBLOCKING)
+        {
+            result = CommunicationInterface::variableNonBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
+                                                                              m_messageSizes, m_iterations, m_syncIterations);
+        }
+
+        // perform logging and reset result variable
+        clock_gettime(CLOCK_MONOTONIC, &endTime);
+        if (m_rank == buRank)
+        {
+            errorMessageCount = result.first;
+            transferredSize = result.second;
+
+            timespec elapsedTime = diff(startTime, endTime);
+            currentRunTimeDiff = elapsedTime.tv_sec + (elapsedTime.tv_nsec / 1e9);
+
+            double avgThroughput = (transferredSize * 8.0) / (currentRunTimeDiff * 1e6);
+
+            if (m_commType == COMM_VARIABLE_BLOCKING || m_commType == COMM_VARIABLE_NONBLOCKING)
+            {
+                performPhaseLogging(ruId, buId, phase, avgThroughput, errorMessageCount);
+            }
+            else
+            {
+                double averageRtt = currentRunTimeDiff / m_iterations;
+                performPhaseLogging(ruId, buId, phase, avgThroughput, errorMessageCount, averageRtt);
+            }
+
+            result = std::make_pair(0, 0);
+        }
+        else if (m_rank == ruRank)
+        {
+            result = std::make_pair(0, 0);
+        }
+
+        performPeriodicalLogging(transferredSize, currentRunTimeDiff, endTime);
+
+        MPI_Barrier(MPI_COMM_WORLD);
     }
-
-    m_currentPhase++;
-
-    performPeriodicalLogging(transferredSize, currentRunTimeDiff, endTime);
-
-    MPI_Barrier(MPI_COMM_WORLD);
 }

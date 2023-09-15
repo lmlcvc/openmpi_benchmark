@@ -20,8 +20,7 @@ public:
 
 protected:
     void initUnitLists();
-    void findCommPairs(std::vector<std::pair<UnitInfo, UnitInfo>> &pairs);
-    void performPhaseLogging(std::string ruId, std::string buId,
+    void performPhaseLogging(std::string ruId, std::string buId, int phase,
                              double throughput, std::size_t errors, double averageRtt);
     void performPeriodicalLogging(std::size_t transferredSize, double currentRunTimeDiff, timespec endTime);
     void handleAverageThroughput();

@@ -13,6 +13,13 @@
 #include <numeric>
 #include <mpi.h>
 
+enum UnitType
+{
+    UNDEFINED,
+    RU,
+    BU
+};
+
 class Unit
 {
 public:
@@ -30,10 +37,12 @@ public:
 
     int8_t *getBuffer() const { return m_buffer; }
 
-    //using shiftFunction = void (Unit::*)();
+    const UnitType getUnitType() const { return m_type; }
+    void setUnitType(UnitType type) { m_type = type; }
+
     void ruShift(int idx);
     void buShift(int idx);
-    //void setShiftFunction(shiftFunction func) { m_shiftFunc = func; }
+    int getPair(int phase) { return (*m_shift)[phase]; }
 
 protected:
     int m_rank;
@@ -45,8 +54,8 @@ protected:
     std::size_t m_bufferBytes = 1e7;
     int8_t *m_buffer;
 
-    std::vector<int> m_shift;
-    //shiftFunction m_shiftFunc;
+    std::unique_ptr<std::vector<int>> m_shift;
+    UnitType m_type = UNDEFINED;
 };
 
 #endif // UNIT_H
