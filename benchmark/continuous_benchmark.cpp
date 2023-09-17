@@ -55,7 +55,7 @@ void ContinuousBenchmark::initUnitLists()
         tmpInfo.rank = i;
 
         // RUs
-        if (i < m_nodesCount / 2)
+        if (i % 2 == 0)
         {
             tmpInfo.id = std::to_string(i + 1);
             m_readoutUnits.push_back(tmpInfo);
@@ -65,7 +65,7 @@ void ContinuousBenchmark::initUnitLists()
                 m_unit->setId(tmpInfo.id);
                 m_unit->setBufferBytes(m_ruBufferBytes);
                 m_unit->setUnitType(UnitType::RU);
-                m_unit->ruShift(m_readoutUnits.size() -1);
+                m_unit->ruShift(m_readoutUnits.size() - 1);
             }
         }
 
@@ -82,7 +82,7 @@ void ContinuousBenchmark::initUnitLists()
                 m_unit->setId(tmpInfo.id);
                 m_unit->setBufferBytes(m_buBufferBytes);
                 m_unit->setUnitType(UnitType::BU);
-                m_unit->buShift(m_builderUnits.size() -1);
+                m_unit->buShift(m_builderUnits.size() - 1);
             }
         }
     }
@@ -349,6 +349,11 @@ void ContinuousBenchmark::run()
 
     for (int phase = 0; phase < m_nodesCount / 2; phase++)
     {
+        MPI_Barrier(MPI_COMM_WORLD);
+        if (m_rank == 0)
+            std::cout << "\n\n============================================================\n\n"
+                      << std::endl;
+
         if (m_unit->getUnitType() == UnitType::RU)
         {
             ruRank = m_rank;
@@ -368,25 +373,28 @@ void ContinuousBenchmark::run()
         transferredSize = 0;
         clock_gettime(CLOCK_MONOTONIC, &startTime);
 
-        if (m_commType == COMM_FIXED_BLOCKING)
+        if (buId != "-1" || ruId != "-1") // skip communication involving dummy nodes
         {
-            result = CommunicationInterface::blockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
-                                                                   m_messageSize, m_iterations);
-        }
-        else if (m_commType == COMM_FIXED_NONBLOCKING)
-        {
-            result = CommunicationInterface::nonBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
-                                                                      m_messageSize, m_iterations, m_syncIterations);
-        }
-        else if (m_commType == COMM_VARIABLE_BLOCKING)
-        {
-            result = CommunicationInterface::variableBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
-                                                                           m_messageSizes, m_iterations);
-        }
-        else if (m_commType == COMM_VARIABLE_NONBLOCKING)
-        {
-            result = CommunicationInterface::variableNonBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
-                                                                              m_messageSizes, m_iterations, m_syncIterations);
+            if (m_commType == COMM_FIXED_BLOCKING)
+            {
+                result = CommunicationInterface::blockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
+                                                                       m_messageSize, m_iterations);
+            }
+            else if (m_commType == COMM_FIXED_NONBLOCKING)
+            {
+                result = CommunicationInterface::nonBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
+                                                                          m_messageSize, m_iterations, m_syncIterations);
+            }
+            else if (m_commType == COMM_VARIABLE_BLOCKING)
+            {
+                result = CommunicationInterface::variableBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
+                                                                               m_messageSizes, m_iterations);
+            }
+            else if (m_commType == COMM_VARIABLE_NONBLOCKING)
+            {
+                result = CommunicationInterface::variableNonBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
+                                                                                  m_messageSizes, m_iterations, m_syncIterations);
+            }
         }
 
         // perform logging and reset result variable
@@ -401,7 +409,13 @@ void ContinuousBenchmark::run()
 
             double avgThroughput = (transferredSize * 8.0) / (currentRunTimeDiff * 1e6);
 
-            if (m_commType == COMM_VARIABLE_BLOCKING || m_commType == COMM_VARIABLE_NONBLOCKING)
+            if (ruId == "-1" || buId == "-1")
+            {
+                ruId = (ruId == "-1") ? "DUMMY" : ruId;
+                buId = (buId == "-1") ? "DUMMY" : buId;
+                performPhaseLogging(ruId, buId, phase, 0, 0);
+            }
+            else if (m_commType == COMM_VARIABLE_BLOCKING || m_commType == COMM_VARIABLE_NONBLOCKING)
             {
                 performPhaseLogging(ruId, buId, phase, avgThroughput, errorMessageCount);
             }
@@ -419,7 +433,5 @@ void ContinuousBenchmark::run()
         }
 
         performPeriodicalLogging(transferredSize, currentRunTimeDiff, endTime);
-
-        MPI_Barrier(MPI_COMM_WORLD);
     }
 }

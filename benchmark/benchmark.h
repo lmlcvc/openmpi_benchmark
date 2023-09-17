@@ -53,9 +53,6 @@ public:
     const std::string getAvgThroughputFilepath() { return m_avgThroughputFilepath; }
     void setAvgThroughputFilepath(std::string path) { m_avgThroughputFilepath = path; }
 
-    const std::string getAvgBwFilepath() { return m_avgBwFilepath; }
-    void setAvgBwFilepath(std::string path) { m_avgBwFilepath = path; }
-
 protected:
     timespec diff(timespec start, timespec end);
     std::vector<std::pair<int, int>> findSubarrayIndices(std::size_t messageSize);
@@ -76,7 +73,6 @@ protected:
 
     std::string m_phasesFilepath;
     std::string m_avgThroughputFilepath;
-    std::string m_avgBwFilepath;
 };
 
 #endif // BENCHMARK_H

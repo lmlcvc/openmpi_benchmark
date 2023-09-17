@@ -19,10 +19,6 @@
 
 volatile sig_atomic_t sigintReceived = 0;
 
-// TODO: run arguments (define and adapt code)
-// FRAG_SIZE
-// CHUNK_SIZE - if none, do not split message ( = FRAG_SIZE )
-
 void handleSignals(int signal)
 {
     if (signal == SIGINT)
@@ -32,13 +28,12 @@ void handleSignals(int signal)
 void printHelp()
 {
     std::cout << "Modes of Operation:\n";
-    std::cout << "  -s            Perform a scan run.\n";
-    std::cout << "  -f            Perform a fixed message size run.\n";
-    std::cout << "  -v            Perform a variable message size run.\n";
-    std::cout << "  -n            Use non-blocking mode.\n\n";
+    std::cout << "  Scan run (-mode scan)\n";
+    std::cout << "  Fixed message size run (-mode fixed)\n";
+    std::cout << "  Variable message size run (-mode variable)\n";
+    std::cout << "  Use non-blocking mode (-n).\n\n";
 
     std::cout << "  SCAN RUN:\n";
-    std::cout << "    -s                      Perform a scan run with varied message sizes.\n";
     std::cout << "    -p <max power>           Set the maximum power of 2 for message sizes.\n";
     std::cout << "    -i <iterations>          Specify the number of iterations.\n";
     std::cout << "    -b <send buffer size>    Set the size of the send buffer in messages.\n";
@@ -46,7 +41,6 @@ void printHelp()
     std::cout << "    -w <warmup iterations>   Set the number of warmup iterations.\n\n";
 
     std::cout << "  FIXED MESSAGE SIZE RUN:\n";
-    std::cout << "    -f                      Perform a run with a fixed message size.\n";
     std::cout << "    -m <message size>        Set the fixed message size.\n";
     std::cout << "    -i <iterations>          Specify the number of iterations.\n";
     std::cout << "    -r <RU buffer bytes>     Set the size of the send buffer in bytes.\n";
@@ -55,13 +49,12 @@ void printHelp()
     std::cout << "    -l <logging interval>    Set the interval for average throughput logging in seconds.\n\n";
 
     std::cout << "  VARIABLE MESSAGE SIZE RUN:\n";
-    std::cout << "    -v                         Perform a run with variable message sizes.\n";
     std::cout << "    -m <message size variants> Set the number of message size variants.\n";
     std::cout << "    -i <iterations>            Specify the number of iterations.\n";
     std::cout << "    -r <RU buffer bytes>       Set the size of the send buffer in bytes.\n";
     std::cout << "    -b <BU buffer bytes>       Set the size of the receive buffer in bytes.\n";
     std::cout << "    -w <warmup iterations>     Set the number of warmup iterations.\n";
-    std::cout << "    -l <logging interval>    Set the interval for average throughput logging in seconds.\n\n";
+    std::cout << "    -l <logging interval>      Set the interval for average throughput logging in seconds.\n\n";
 }
 
 timespec diff(timespec start, timespec end)
@@ -256,7 +249,6 @@ int main(int argc, char **argv)
 
     benchmark->setPhasesFilepath(createLogFilepath("phases", rank));
     benchmark->setAvgThroughputFilepath(createLogFilepath("avg_throughput", rank));
-    benchmark->setAvgBwFilepath(createLogFilepath("avg_bw", rank));
 
     std::signal(SIGINT, [](int signal)
                 { handleSignals(signal); });
