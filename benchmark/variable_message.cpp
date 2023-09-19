@@ -82,6 +82,8 @@ void BenchmarkVariableMessage::parseArguments(std::vector<ArgumentEntry> args)
             tmp = std::stoul(entry.value);
             m_lastAvgCalculationInterval = (tmp > 0) ? tmp : m_lastAvgCalculationInterval;
             break;
+        case 'c':
+            m_unit->setConfigPath(entry.value);
         default:
             if (m_rank == 0)
             {
@@ -118,5 +120,3 @@ void BenchmarkVariableMessage::initMessageSizes()
         m_messageSizes.push_back(messageSize);
     }
 }
-
-

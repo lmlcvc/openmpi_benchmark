@@ -57,7 +57,7 @@ void ContinuousBenchmark::initUnitLists()
         // RUs
         if (i % 2 == 0)
         {
-            tmpInfo.id = std::to_string(i + 1);
+            tmpInfo.id = std::to_string(m_readoutUnits.size());
             m_readoutUnits.push_back(tmpInfo);
 
             if (m_rank == i)
@@ -199,8 +199,7 @@ void ContinuousBenchmark::performWarmup()
                   << std::endl;
 }
 
-// TODO: change body with performAverageThroughput logging
-void ContinuousBenchmark::handleAverageThroughput()
+void ContinuousBenchmark::performPeriodicalLogging()
 {
     double avgThroughput = (m_totalTransferredSize * 8.0) / (m_totalElapsedTime * 1e6);
 
@@ -291,14 +290,14 @@ void ContinuousBenchmark::performPhaseLogging(std::string ruId, std::string buId
     }
 }
 
-void ContinuousBenchmark::performPeriodicalLogging(std::size_t transferredSize, double currentRunTimeDiff, timespec endTime)
+void ContinuousBenchmark::handleAverageThroughput(std::size_t transferredSize, double currentRunTimeDiff, timespec endTime)
 {
     timespec lastAvgCalculationDiff = diff(m_lastAvgCalculationTime, endTime);
     double secsFromLastAvg = lastAvgCalculationDiff.tv_sec + (lastAvgCalculationDiff.tv_nsec / 1e9);
     if (secsFromLastAvg >= m_lastAvgCalculationInterval) // TODO: -1 if off
     {
         if (m_rank == 0)
-            handleAverageThroughput();
+            performPeriodicalLogging();
         m_totalTransferredSize = 0;
         m_totalElapsedTime = 0.0;
         clock_gettime(CLOCK_MONOTONIC, &m_lastAvgCalculationTime);
@@ -432,6 +431,6 @@ void ContinuousBenchmark::run()
             result = std::make_pair(0, 0);
         }
 
-        performPeriodicalLogging(transferredSize, currentRunTimeDiff, endTime);
+        handleAverageThroughput(transferredSize, currentRunTimeDiff, endTime);
     }
 }

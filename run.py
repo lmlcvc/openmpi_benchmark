@@ -7,15 +7,12 @@ import shlex
 import argparse
 import re
 
-executable_path = "./main"
+executable_path = os.path.abspath('main')
 mpi_base_command = shlex.split('mpirun --oversubscribe')
-mpi_environment_options = shlex.split('-x')
-mpi_base_options = shlex.split('-bind-to none')
+mpi_environment_options = shlex.split('-x UCX_NET_DEVICES=')
+mpi_base_options = shlex.split('-map-by node -bind-to none')
 mpi_binding_options = 'hwloc-bind --membind --cpubind os='
 
-# FIXME: add to command:
-# hwloc-bind --membind --cpubind os=network device
-        # mpirun was unable to find the specified executable file, and therefore did not launch the job.
 
 def signal_handler(sig, frame):
     print('Caught SIGINT. Exiting...')
@@ -28,17 +25,17 @@ def parse_hostfile(hostfile_name):
         comment_match = re.compile('([^#]*)')
         matches = map(comment_match.search, hostfile.readlines())
         hosts = [match.group(0).strip() for match in matches if match != None]
-
-    print(hosts)
     return hosts
 
-def start_run(host_list, mode, max_power=None, iterations=None, send_buffer_size=None, receive_buffer_size=None, warmup_iterations=None, message_size=None, ru_buffer_bytes=None, bu_buffer_bytes=None, logging_interval=None, explanation=False, non_blocking=False):
+def start_run(host_list, mode, config,
+              max_power=None, iterations=None, send_buffer_size=None, receive_buffer_size=None, warmup_iterations=None,
+              message_size=None, ru_buffer_bytes=None, bu_buffer_bytes=None, logging_interval=None, explanation=False, non_blocking=False):
     mpi_command = mpi_base_command.copy()
     mpi_command.extend(mpi_base_options)
 
-    host_info = [(host.split()[0], host.split()[1]) for host in host_list]
+    host_info = [(host.split()[0], host.split()[1]) for host in host_list if host != "-1"]
 
-    mpi_options = []
+    run_options = []
 
     if explanation:
         for (host, network_device) in host_info:
@@ -50,69 +47,67 @@ def start_run(host_list, mode, max_power=None, iterations=None, send_buffer_size
         return subprocess.Popen(mpi_command, shell=False)
 
     if warmup_iterations is not None:
-        mpi_options.extend(["-w", str(warmup_iterations)])
+        run_options.extend(["-w", str(warmup_iterations)])
 
     if mode == "scan":
-        mpi_options.extend(["-s"])
+        run_options.extend(["-s"])
         if max_power is not None:
-            mpi_options.extend(["-p", str(max_power)])
+            run_options.extend(["-p", str(max_power)])
         if iterations is not None:
-            mpi_options.extend(["-i", str(iterations)])
+            run_options.extend(["-i", str(iterations)])
         if send_buffer_size is not None:
-            mpi_options.extend(["-b", str(send_buffer_size)])
+            run_options.extend(["-b", str(send_buffer_size)])
         if receive_buffer_size is not None:
-            mpi_options.extend(["-r", str(receive_buffer_size)])
+            run_options.extend(["-r", str(receive_buffer_size)])
         
     elif mode == "fixed":
-        mpi_options.extend(["-f"])
+        run_options.extend(["-f"])
         if message_size is not None:
-            mpi_options.extend(["-m", str(message_size)])
+            run_options.extend(["-m", str(message_size)])
         if iterations is not None:
-            mpi_options.extend(["-i", str(iterations)])
+            run_options.extend(["-i", str(iterations)])
         if ru_buffer_bytes is not None:
-            mpi_options.extend(["-r", str(ru_buffer_bytes)])
+            run_options.extend(["-r", str(ru_buffer_bytes)])
         if bu_buffer_bytes is not None:
-            mpi_options.extend(["-b", str(bu_buffer_bytes)])
+            run_options.extend(["-b", str(bu_buffer_bytes)])
         if logging_interval is not None:
-            mpi_options.extend(["-l", str(logging_interval)])
+            run_options.extend(["-l", str(logging_interval)])
 
     elif mode == "variable":
-        mpi_options.extend(["-v"])
+        run_options.extend(["-v"])
         if message_size is not None:
-            mpi_options.extend(["-m", str(message_size)])
+            run_options.extend(["-m", str(message_size)])
         if iterations is not None:
-            mpi_options.extend(["-i", str(iterations)])
+            run_options.extend(["-i", str(iterations)])
         if ru_buffer_bytes is not None:
-            mpi_options.extend(["-r", str(ru_buffer_bytes)])
+            run_options.extend(["-r", str(ru_buffer_bytes)])
         if bu_buffer_bytes is not None:
-            mpi_options.extend(["-b", str(bu_buffer_bytes)])
+            run_options.extend(["-b", str(bu_buffer_bytes)])
         if logging_interval is not None:
-            mpi_options.extend(["-l", str(logging_interval)])
+            run_options.extend(["-l", str(logging_interval)])
 
     if non_blocking:
-        mpi_options.extend(["-n"])
+        run_options.extend(["-n"])
 
-    ru_commands = [executable_path, ' '.join(mpi_options), ":"]
-    bu_commands = [executable_path, ' '.join(mpi_options), ":"]
+    ru_commands = shlex.split(f"{executable_path} -c {config} {' '.join(run_options)}")
+    bu_commands = shlex.split(f"{executable_path} -c {config} {' '.join(run_options)}")
 
     for (host, network_device) in host_info:
         # RU
-        mpi_command.extend(["--host", f"{host}"])
-        mpi_command.extend(["-x", f"UCX_NET_DEVICES={network_device}:1"])
-        # FIXME: mpi_command.extend([f"{mpi_binding_options}{network_device}:1"])
+        mpi_command.extend(shlex.split(f'--host {host}'))
+        mpi_command.extend(shlex.split(f"-x UCX_NET_DEVICES={network_device}:1"))
+        mpi_command.extend(shlex.split(f"{mpi_binding_options}{network_device}"))
         mpi_command.extend(ru_commands)
+        mpi_command.append(":")
 
         # BU
-        mpi_command.extend(["--host", f"{host}"])
-        mpi_command.extend(["-x", f"UCX_NET_DEVICES={network_device}:1"])
-        # FIXME: mpi_command.extend([f"{mpi_binding_options}{network_device}:1"])
+        mpi_command.extend(shlex.split(f'--host {host}'))
+        mpi_command.extend(shlex.split(f"-x UCX_NET_DEVICES={network_device}:1"))
+        mpi_command.extend(shlex.split(f"{mpi_binding_options}{network_device}"))
         mpi_command.extend(bu_commands)
-        
+        mpi_command.append(":")
 
-    print(f"MPI command: {' '.join(mpi_command)}")
-    return subprocess.Popen(mpi_command, shell=False)
-
-
+    return subprocess.Popen(mpi_command, stderr=subprocess.PIPE, shell=False)
 
 def main():
     parser = argparse.ArgumentParser(
@@ -128,6 +123,12 @@ def main():
         type=str,
         required=True)
     
+    parser.add_argument(
+        "-c",
+        "--config",
+        help='Configuration json with info on the hosts.',
+        type=str,
+        default='config.json')    
 
     parser.add_argument('-mode', '--mode',
                         type=str,
@@ -151,8 +152,10 @@ def main():
     args = parser.parse_args()
     hosts = parse_hostfile(args.hostfile)
 
+
     start_run(
         host_list=hosts,
+        config=args.config,
         mode=args.mode,
         max_power=args.max_power,
         iterations=args.iterations,

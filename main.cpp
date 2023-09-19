@@ -46,7 +46,8 @@ void printHelp()
     std::cout << "    -r <RU buffer bytes>     Set the size of the send buffer in bytes.\n";
     std::cout << "    -b <BU buffer bytes>     Set the size of the receive buffer in bytes.\n";
     std::cout << "    -w <warmup iterations>   Set the number of warmup iterations.\n";
-    std::cout << "    -l <logging interval>    Set the interval for average throughput logging in seconds.\n\n";
+    std::cout << "    -l <logging interval>    Set the interval for average throughput logging in seconds.\n";
+    std::cout << "    -c <config path>         Configuration json with info on the hosts.\n\n";
 
     std::cout << "  VARIABLE MESSAGE SIZE RUN:\n";
     std::cout << "    -m <message size variants> Set the number of message size variants.\n";
@@ -54,7 +55,8 @@ void printHelp()
     std::cout << "    -r <RU buffer bytes>       Set the size of the send buffer in bytes.\n";
     std::cout << "    -b <BU buffer bytes>       Set the size of the receive buffer in bytes.\n";
     std::cout << "    -w <warmup iterations>     Set the number of warmup iterations.\n";
-    std::cout << "    -l <logging interval>      Set the interval for average throughput logging in seconds.\n\n";
+    std::cout << "    -l <logging interval>      Set the interval for average throughput logging in seconds.\n";
+    std::cout << "    -c <config path>         Configuration json with info on the hosts.\n\n";
 }
 
 timespec diff(timespec start, timespec end)
@@ -87,7 +89,7 @@ void parseArguments(int argc, char **argv, int rank, CommunicationType &commType
 {
     int opt;
     bool nonblocking = false;
-    while ((opt = getopt(argc, argv, "m:i:b:w:sfvr:l:nh")) != -1)
+    while ((opt = getopt(argc, argv, "m:i:b:w:sfvr:l:c:nh")) != -1)
     {
         switch (opt)
         {
@@ -137,6 +139,7 @@ void parseArguments(int argc, char **argv, int rank, CommunicationType &commType
         case 'w':
         case 'p':
         case 'l':
+        case 'c':
             commArguments.push_back({static_cast<char>(opt), optarg});
             break;
         case 'h':
@@ -255,7 +258,7 @@ int main(int argc, char **argv)
 
     // Run program
     clock_gettime(CLOCK_MONOTONIC, &runStartTime);
-    benchmark->performWarmup();
+    benchmark->performWarmup(); // FIXME: ineffective
 
     do
     {

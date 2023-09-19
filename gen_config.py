@@ -2,8 +2,6 @@ import json
 import argparse
 import numpy as np
 import re
-import itertools
-import shlex
 import collections
 
 
@@ -159,38 +157,28 @@ def generate_shift(host_list, switch_radix):
     return shift_pattern
 
 def verify_devices(hosts):
-    # XXX: do dummies also have to come in pairs?
-    # XXX: do network device names have to match?
-    # XXX: does a host need to use all network devices?
-    host_device_map = {}
+    dummy_count = sum(1 for host in hosts if host.name != "-1")
+    if(dummy_count % 2 != 0):
+        print("Invalid dummy node count")
+        return False
 
-    # collect devices for each host
+    host_devices = {}
     for host in hosts:
-        if host.idx >= 0:
-            if host.name not in host_device_map:
-                host_device_map[host.name] = set()
-             
-            if host.device in host_device_map[host.name]:
-                print(f"Error: Host {host.name} has duplicate device {host.device}.")
-                return False
-        
-            host_device_map[host.name].add(host.device)
+        if host.name != "-1":
+            if host.name not in host_devices:
+                host_devices[host.name] = set()
+            host_devices[host.name].add(host.device)
 
-    for host, devices in host_device_map.items():
-        if len(devices) != 2:
-            print(f"Error: Host {host} does not have exactly two devices.")
-            return False
+    failed_hosts = []
+    for host, devices in host_devices.items():
+        if len(devices) != 2 or not all(device in {0, 1} for device in devices):
+            failed_hosts.append(host)
 
-        # validate name pairs
-        device_names = list(devices)
-        if (
-            ("HCA-1" in device_names and "HCA-2" in device_names) or
-            ("mlx5_0" in device_names and "mlx5_1" in device_names)
-        ):
-            continue
-        else:
-            print(f"Error: Host {host} does not have valid device names.")
-            return False
+    if len(failed_hosts) != 0:
+        print("Following hosts do not use exactly 2 different devices:")
+        for host in failed_hosts:
+            print(host)
+        return False
 
     return True
 
@@ -251,19 +239,20 @@ def main():
         host_match = args.nodes.split(',')
         hosts = parse_file_hosts(args.fat_tree_file, host_match)
 
-    with open(args.json, 'w') as outfile:
-        json.dump(generate_json(hosts), outfile, indent=2)
+    if(verify_devices(hosts)):
+        with open(args.json, 'w') as outfile:
+            json.dump(generate_json(hosts), outfile, indent=2)
 
-    with open(args.hostfile, 'w') as outfile:
-        outfile.write('\n'.join(generate_hostfile(hosts)))
+        with open(args.hostfile, 'w') as outfile:
+            outfile.write('\n'.join(generate_hostfile(hosts)))
 
-    shift_pattern = np.concatenate(generate_shift(hosts, args.radix))
-    n_nodes = np.count_nonzero(shift_pattern != -1)
-    n_dummy = len(shift_pattern) - n_nodes
-    print('EB_transport.shift_pattern = {', ','.join(map(str, shift_pattern)),
-          '};')
-    print(
-        f'// n_nodes {n_nodes} n_dummy {n_dummy} active fraction {n_nodes/(n_nodes+n_dummy)}')
+        shift_pattern = np.concatenate(generate_shift(hosts, args.radix))
+        n_nodes = np.count_nonzero(shift_pattern != -1)
+        n_dummy = len(shift_pattern) - n_nodes
+        print('EB_transport.shift_pattern = {', ','.join(map(str, shift_pattern)),
+            '};')
+        print(
+            f'// n_nodes {n_nodes} n_dummy {n_dummy} active fraction {n_nodes/(n_nodes+n_dummy)}')
     
 
 if __name__ == "__main__":

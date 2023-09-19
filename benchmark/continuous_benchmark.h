@@ -22,8 +22,8 @@ protected:
     void initUnitLists();
     void performPhaseLogging(std::string ruId, std::string buId, int phase,
                              double throughput, std::size_t errors, double averageRtt);
-    void performPeriodicalLogging(std::size_t transferredSize, double currentRunTimeDiff, timespec endTime);
-    void handleAverageThroughput();
+    void handleAverageThroughput(std::size_t transferredSize, double currentRunTimeDiff, timespec endTime);
+    void performPeriodicalLogging();
 
     CommunicationType m_commType = COMM_UNDEFINED;
     std::size_t m_messageSize = -1;
