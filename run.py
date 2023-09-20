@@ -27,7 +27,7 @@ def parse_hostfile(hostfile_name):
         hosts = [match.group(0).strip() for match in matches if match != None]
     return hosts
 
-def start_run(host_list, mode, config,
+def start_run(host_list, config, mode, messages_per_phase=None,
               max_power=None, iterations=None, send_buffer_size=None, receive_buffer_size=None, warmup_iterations=None,
               message_size=None, ru_buffer_bytes=None, bu_buffer_bytes=None, logging_interval=None, explanation=False, non_blocking=False):
     mpi_command = mpi_base_command.copy()
@@ -64,6 +64,8 @@ def start_run(host_list, mode, config,
         run_options.extend(["-f"])
         if message_size is not None:
             run_options.extend(["-m", str(message_size)])
+        if messages_per_phase is not None:
+            run_options.extend(["-p", str(messages_per_phase)])
         if iterations is not None:
             run_options.extend(["-i", str(iterations)])
         if ru_buffer_bytes is not None:
@@ -77,6 +79,8 @@ def start_run(host_list, mode, config,
         run_options.extend(["-v"])
         if message_size is not None:
             run_options.extend(["-m", str(message_size)])
+        if messages_per_phase is not None:
+            run_options.extend(["-p", str(messages_per_phase)])
         if iterations is not None:
             run_options.extend(["-i", str(iterations)])
         if ru_buffer_bytes is not None:
@@ -138,11 +142,12 @@ def main():
 
     parser.add_argument('-e', '--explanation', action='store_true', help='Print detailed usage explanation')
     parser.add_argument('-n', '--non-blocking', action='store_true', help='Enable nonblocking mode')
-    parser.add_argument('-p', '--max-power', type=int, help='Set the maximum power of 2 for message sizes')
+    parser.add_argument('-mp', '--max-power', type=int, help='Set the maximum power of 2 for message sizes (scan)')
+    parser.add_argument('-m', '--messages-per-phase', type=int, help='Set the number of messages to be sent in a phase (continuous)')
     parser.add_argument('-i', '--iterations', type=int, help='Specify the number of iterations')
     parser.add_argument('-bs', '--send-buffer-size', type=int, help='Set the size of the send buffer in messages')
     parser.add_argument('-rs', '--receive-buffer-size', type=int, help='Set the size of the receive buffer in messages')
-    parser.add_argument('-m', '--message-size', type=int, help='Set the fixed message size')
+    parser.add_argument('-ms', '--message-size', type=int, help='Set the fixed message size')
     parser.add_argument('-r', '--ru-buffer-bytes', type=int, help='Set the size of the send buffer in bytes')
     parser.add_argument('-b', '--bu-buffer-bytes', type=int, help='Set the size of the receive buffer in bytes')
     parser.add_argument('-w', '--warmup-iterations', type=int, help='Set the number of warmup iterations')
@@ -157,6 +162,7 @@ def main():
         host_list=hosts,
         config=args.config,
         mode=args.mode,
+        messages_per_phase=args.messages_per_phase,
         max_power=args.max_power,
         iterations=args.iterations,
         send_buffer_size=args.send_buffer_size,

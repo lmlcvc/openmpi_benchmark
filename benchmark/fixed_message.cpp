@@ -77,10 +77,13 @@ void BenchmarkFixedMessage::parseArguments(std::vector<ArgumentEntry> args)
             tmp = std::stoul(entry.value);
             m_messageSize = (tmp > 0) ? tmp : m_messageSize;
             break;
+        case 'p':
+            tmp = std::stoul(entry.value);
+            m_messagesPerPhase = (tmp > 0) ? tmp : m_messagesPerPhase;
+            break;
         case 'i':
             tmp = std::stoul(entry.value);
-            std::cout << entry.value << std::endl;
-            m_iterations = tmp; // (tmp >= m_minIterations) ? tmp : m_iterations;
+            m_iterations = tmp;
             break;
         case 'w':
             tmp = std::stoul(entry.value);

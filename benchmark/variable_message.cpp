@@ -70,6 +70,10 @@ void BenchmarkVariableMessage::parseArguments(std::vector<ArgumentEntry> args)
             tmp = std::stoul(entry.value);
             m_messageSizeVariants = (tmp > 0) ? tmp : m_messageSizeVariants;
             break;
+        case 'p':
+            tmp = std::stoul(entry.value);
+            m_messagesPerPhase = (tmp > 0) ? tmp : m_messagesPerPhase;
+            break;
         case 'i':
             tmp = std::stoul(entry.value);
             m_iterations = (tmp >= m_minIterations) ? tmp : m_iterations;

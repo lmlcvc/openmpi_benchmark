@@ -28,6 +28,7 @@ protected:
     CommunicationType m_commType = COMM_UNDEFINED;
     std::size_t m_messageSize = -1;
     std::vector<std::size_t> m_messageSizes;
+    std::size_t m_messagesPerPhase = 1;
 
     const std::size_t minMessageSize = 1e4;
     std::size_t m_syncIterations;
