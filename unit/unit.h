@@ -41,7 +41,7 @@ public:
     const UnitType getUnitType() const { return m_type; }
     void setUnitType(UnitType type) { m_type = type; }
 
-    void setConfigPath(const std::string &path) { *m_configPath = path; }
+    void setConfigPath(const std::string &path) { m_configPath = path; }
 
     void ruShift(int idx);
     void buShift(int idx);
@@ -49,6 +49,7 @@ public:
 
 protected:
     void parseConfig(const std::string &jsonFile);
+    void markDummies();
 
     int m_rank;
     std::string m_id;
@@ -62,7 +63,7 @@ protected:
     std::unique_ptr<std::vector<int>> m_shift;
     UnitType m_type = UNDEFINED;
     std::vector<int> m_dummies;
-    std::string *m_configPath;
+    std::string m_configPath;
 };
 
 #endif // UNIT_H

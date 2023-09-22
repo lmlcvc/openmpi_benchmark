@@ -19,13 +19,6 @@ Unit::Unit()
 
     m_shift = std::make_unique<std::vector<int>>(size / 2);
     std::iota(m_shift->begin(), m_shift->end(), 0);
-
-    parseConfig("host.json"); // TODO: pass as parameter
-    for (int pos : m_dummies)
-    {
-        if (pos >= 0 && pos < m_shift->size())
-            m_shift->at(pos) = -1;
-    }
 }
 
 void Unit::allocateMemory()
@@ -108,13 +101,26 @@ void Unit::parseConfig(const std::string &jsonFile)
     }
 }
 
+void Unit::markDummies()
+{
+    parseConfig(m_configPath);
+    for (int pos : m_dummies)
+    {
+        if (pos >= 0 && pos < m_shift->size())
+            m_shift->at(pos) = -1;
+    }
+}
+
 void Unit::ruShift(int idx)
 {
+    markDummies();
     std::rotate(m_shift->begin(), m_shift->begin() + idx, m_shift->end());
 }
 
 void Unit::buShift(int idx)
 {
+    markDummies();
+
     std::vector<int> vec_r(m_shift->size());
     std::copy(m_shift->rbegin(), m_shift->rend(), vec_r.begin());
 
