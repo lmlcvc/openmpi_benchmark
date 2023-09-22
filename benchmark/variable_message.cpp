@@ -88,6 +88,7 @@ void BenchmarkVariableMessage::parseArguments(std::vector<ArgumentEntry> args)
             break;
         case 'c':
             m_unit->setConfigPath(entry.value);
+            break;
         default:
             if (m_rank == 0)
             {

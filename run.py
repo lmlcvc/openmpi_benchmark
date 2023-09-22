@@ -142,7 +142,7 @@ def main():
 
     parser.add_argument('-e', '--explanation', action='store_true', help='Print detailed usage explanation')
     parser.add_argument('-n', '--non-blocking', action='store_true', help='Enable nonblocking mode')
-    parser.add_argument('-mp', '--max-power', type=int, help='Set the maximum power of 2 for message sizes (scan)')
+    parser.add_argument('-mp', '--max-power', type=int, help='Set the maximum power of 2 for message sizes (scan)', default='1')
     parser.add_argument('-m', '--messages-per-phase', type=int, help='Set the number of messages to be sent in a phase (continuous)')
     parser.add_argument('-i', '--iterations', type=int, help='Specify the number of iterations')
     parser.add_argument('-bs', '--send-buffer-size', type=int, help='Set the size of the send buffer in messages')
@@ -157,10 +157,9 @@ def main():
     args = parser.parse_args()
     hosts = parse_hostfile(args.hostfile)
 
-
     start_run(
         host_list=hosts,
-        config=args.config,
+        config=os.path.join(os.getcwd(), args.config),
         mode=args.mode,
         messages_per_phase=args.messages_per_phase,
         max_power=args.max_power,

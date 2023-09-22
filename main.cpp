@@ -42,6 +42,7 @@ void printHelp()
 
     std::cout << "  FIXED MESSAGE SIZE RUN:\n";
     std::cout << "    -m <message size>        Set the fixed message size.\n";
+    std::cout << "    -p <msgs per phase>      Set the number of messages in each phase.\n";
     std::cout << "    -i <iterations>          Specify the number of iterations.\n";
     std::cout << "    -r <RU buffer bytes>     Set the size of the send buffer in bytes.\n";
     std::cout << "    -b <BU buffer bytes>     Set the size of the receive buffer in bytes.\n";
@@ -51,12 +52,13 @@ void printHelp()
 
     std::cout << "  VARIABLE MESSAGE SIZE RUN:\n";
     std::cout << "    -m <message size variants> Set the number of message size variants.\n";
+    std::cout << "    -p <msgs per phase>        Set the number of messages in each phase.\n";
     std::cout << "    -i <iterations>            Specify the number of iterations.\n";
     std::cout << "    -r <RU buffer bytes>       Set the size of the send buffer in bytes.\n";
     std::cout << "    -b <BU buffer bytes>       Set the size of the receive buffer in bytes.\n";
     std::cout << "    -w <warmup iterations>     Set the number of warmup iterations.\n";
     std::cout << "    -l <logging interval>      Set the interval for average throughput logging in seconds.\n";
-    std::cout << "    -c <config path>         Configuration json with info on the hosts.\n\n";
+    std::cout << "    -c <config path>           Configuration json with info on the hosts.\n\n";
 }
 
 timespec diff(timespec start, timespec end)
@@ -89,7 +91,7 @@ void parseArguments(int argc, char **argv, int rank, CommunicationType &commType
 {
     int opt;
     bool nonblocking = false;
-    while ((opt = getopt(argc, argv, "m:i:b:w:sfvr:l:c:nh")) != -1)
+    while ((opt = getopt(argc, argv, "m:i:b:w:sfvr:l:c:p:nh")) != -1)
     {
         switch (opt)
         {
@@ -225,6 +227,8 @@ int main(int argc, char **argv)
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
     MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
+
+    std::cout << "Rank " << rank << " initialised" << std::endl;
 
     // Benchmark object initialisation
     parseArguments(argc, argv, rank, commType, commArguments);
