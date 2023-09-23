@@ -47,7 +47,6 @@ std::string messageSizeToString(CommunicationType commType, std::size_t messageS
 void ContinuousBenchmark::initUnitLists()
 {
     UnitInfo tmpInfo;
-    std::string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     std::string currentID = "A";
 
     for (std::size_t i = 0; i < m_nodesCount; i++)
@@ -354,7 +353,7 @@ void ContinuousBenchmark::run()
             ruRank = m_rank;
             ruId = m_unit->getId();
             buRank = m_builderUnits.at(m_unit->getPair(phase)).rank;
-            ruId = (ruRank == -1) ? "DUMMY" : m_builderUnits.at(m_unit->getPair(phase)).id;
+            buId = (buRank == -1) ? "DUMMY" : m_builderUnits.at(m_unit->getPair(phase)).id;
         }
         else if (m_unit->getUnitType() == UnitType::BU)
         {

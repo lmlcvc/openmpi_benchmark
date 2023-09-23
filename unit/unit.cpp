@@ -13,12 +13,7 @@ std::string sanitizeHostname(const std::string &input)
 
 Unit::Unit()
 {
-    int size;
     MPI_Comm_rank(MPI_COMM_WORLD, &m_rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-
-    // m_shift = std::make_unique<std::vector<int>>;//(size / 2);
-    // std::iota(m_shift->begin(), m_shift->end(), 0);
 }
 
 void Unit::allocateMemory()
@@ -42,7 +37,6 @@ void Unit::allocateMemory()
 
 void Unit::parseConfig()
 {
-    // TODO: should init shift pattern from config file
     std::ifstream file(m_configPath);
     if (!file)
     {
@@ -101,13 +95,13 @@ void Unit::parseConfig()
         if (((m_type == BU) && (nodeInd % 2 == 0))     // append RUs to BU shift vector
             || ((m_type == RU) && (nodeInd % 2 == 1))) // append BUs to RU shift vector
         {
-            if (hostname == "-1")   // mark dummies
+            if (hostname == "-1") // mark dummies
             {
                 m_shift.push_back(-1);
             }
             else
             {
-                m_shift.push_back(rankId); 
+                m_shift.push_back(rankId / 2);
             }
         }
         nodeInd++;

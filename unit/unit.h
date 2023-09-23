@@ -61,7 +61,7 @@ protected:
 
     std::vector<int> m_shift;
     UnitType m_type = UNDEFINED;
-    std::string m_configPath;
+    std::string m_configPath = "config.json";
 };
 
 #endif // UNIT_H
