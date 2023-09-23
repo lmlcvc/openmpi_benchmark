@@ -294,7 +294,7 @@ void ContinuousBenchmark::handleAverageThroughput(std::size_t transferredSize, d
 {
     timespec lastAvgCalculationDiff = diff(m_lastAvgCalculationTime, endTime);
     double secsFromLastAvg = lastAvgCalculationDiff.tv_sec + (lastAvgCalculationDiff.tv_nsec / 1e9);
-    if (secsFromLastAvg >= m_lastAvgCalculationInterval) // TODO: -1 if off
+    if (secsFromLastAvg >= m_lastAvgCalculationInterval) 
     {
         if (m_rank == 0)
             performPeriodicalLogging();
@@ -354,14 +354,14 @@ void ContinuousBenchmark::run()
             ruRank = m_rank;
             ruId = m_unit->getId();
             buRank = m_builderUnits.at(m_unit->getPair(phase)).rank;
-            buId = m_builderUnits.at(m_unit->getPair(phase)).id;
+            ruId = (ruRank == -1) ? "DUMMY" : m_builderUnits.at(m_unit->getPair(phase)).id;
         }
         else if (m_unit->getUnitType() == UnitType::BU)
         {
             buRank = m_rank;
             buId = m_unit->getId();
             ruRank = m_readoutUnits.at(m_unit->getPair(phase)).rank;
-            ruId = m_readoutUnits.at(m_unit->getPair(phase)).id;
+            ruId = (ruRank == -1) ? "DUMMY" : m_readoutUnits.at(m_unit->getPair(phase)).id;
         }
 
         // perform communication
@@ -371,7 +371,7 @@ void ContinuousBenchmark::run()
         double currentRunTimeDiff = 0.0;
         clock_gettime(CLOCK_MONOTONIC, &startTime);
 
-        if (buId != "-1" && ruId != "-1") // skip communication involving dummy nodes
+        if (ruRank != -1 && buRank != -1) // skip communication involving dummy nodes
         {
             for (int message = 0; message < m_messagesPerPhase; message++)
             {
@@ -416,12 +416,10 @@ void ContinuousBenchmark::run()
         elapsedTime = diff(startTime, endTime);
         currentRunTimeDiff += (elapsedTime.tv_sec + (elapsedTime.tv_nsec / 1e9));
 
-        if (m_rank == buRank)
+        if ((m_rank == buRank) || (buRank == -1))
         {
-            if (ruId == "-1" || buId == "-1")
+            if (ruRank == -1 || buRank == -1)
             {
-                ruId = (ruId == "-1") ? "DUMMY" : ruId;
-                buId = (buId == "-1") ? "DUMMY" : buId;
                 performPhaseLogging(ruId, buId, phase, 0, 0);
             }
             else if (m_commType == COMM_VARIABLE_BLOCKING || m_commType == COMM_VARIABLE_NONBLOCKING)

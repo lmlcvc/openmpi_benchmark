@@ -45,11 +45,10 @@ public:
 
     void ruShift(int idx);
     void buShift(int idx);
-    int getPair(int phase) { return (*m_shift)[phase]; }
+    int getPair(int phase) { return m_shift[phase]; }
 
 protected:
-    void parseConfig(const std::string &jsonFile);
-    void markDummies();
+    void parseConfig();
 
     int m_rank;
     std::string m_id;
@@ -60,9 +59,8 @@ protected:
     std::size_t m_bufferBytes = 1e7;
     int8_t *m_buffer;
 
-    std::unique_ptr<std::vector<int>> m_shift;
+    std::vector<int> m_shift;
     UnitType m_type = UNDEFINED;
-    std::vector<int> m_dummies;
     std::string m_configPath;
 };
 

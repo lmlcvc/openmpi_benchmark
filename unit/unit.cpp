@@ -17,8 +17,8 @@ Unit::Unit()
     MPI_Comm_rank(MPI_COMM_WORLD, &m_rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    m_shift = std::make_unique<std::vector<int>>(size / 2);
-    std::iota(m_shift->begin(), m_shift->end(), 0);
+    // m_shift = std::make_unique<std::vector<int>>;//(size / 2);
+    // std::iota(m_shift->begin(), m_shift->end(), 0);
 }
 
 void Unit::allocateMemory()
@@ -40,12 +40,13 @@ void Unit::allocateMemory()
     m_memBufferPtr = buffer_t(mem, free);
 }
 
-void Unit::parseConfig(const std::string &jsonFile)
+void Unit::parseConfig()
 {
-    std::ifstream file(jsonFile);
+    // TODO: should init shift pattern from config file
+    std::ifstream file(m_configPath);
     if (!file)
     {
-        std::cerr << "Failed to open JSON file: " << jsonFile << std::endl;
+        std::cerr << "Failed to open JSON file: " << m_configPath << std::endl;
         return;
     }
 
@@ -56,7 +57,7 @@ void Unit::parseConfig(const std::string &jsonFile)
         json += line;
     }
 
-    size_t index = 0;
+    size_t index = 0, nodeInd = 0;
     while (index < json.size())
     {
         size_t hostnameStart = json.find("\"hostname\"", index);
@@ -71,59 +72,61 @@ void Unit::parseConfig(const std::string &jsonFile)
         if (valueEnd == std::string::npos)
             break;
 
+        // get host name
         std::string hostname = json.substr(valueStart, valueEnd - valueStart - 1);
         hostname = sanitizeHostname(hostname);
         index = valueEnd + 1;
 
-        if (hostname == "-1")
+        // get index
+        size_t rankidStart = json.find("\"rankid\"", index);
+        int rankId;
+        if (rankidStart != std::string::npos)
         {
-            // get index of dummy
-            size_t rankidStart = json.find("\"rankid\"", index);
-            if (rankidStart != std::string::npos)
+            size_t rankidValueStart = json.find(":", rankidStart);
+            if (rankidValueStart != std::string::npos)
             {
-                size_t rankidValueStart = json.find(":", rankidStart);
-                if (rankidValueStart != std::string::npos)
+                size_t rankidValueEnd = json.find_first_of(",", rankidValueStart + 1);
+                if (rankidValueEnd == std::string::npos)
                 {
-                    size_t rankidValueEnd = json.find_first_of(",", rankidValueStart + 1);
-                    if (rankidValueEnd == std::string::npos)
-                    {
-                        rankidValueEnd = json.find("}", rankidValueStart + 1);
-                    }
-                    if (rankidValueEnd != std::string::npos)
-                    {
-                        std::string rankidStr = json.substr(rankidValueStart + 1, rankidValueEnd - rankidValueStart);
-                        int rankid = std::stoi(rankidStr);
-                        m_dummies.push_back(rankid);
-                    }
+                    rankidValueEnd = json.find("}", rankidValueStart + 1);
+                }
+                if (rankidValueEnd != std::string::npos)
+                {
+                    std::string rankidStr = json.substr(rankidValueStart + 1, rankidValueEnd - rankidValueStart);
+                    rankId = std::stoi(rankidStr);
                 }
             }
         }
-    }
-}
 
-void Unit::markDummies()
-{
-    parseConfig(m_configPath);
-    for (int pos : m_dummies)
-    {
-        if (pos >= 0 && pos < m_shift->size())
-            m_shift->at(pos) = -1;
+        if (((m_type == BU) && (nodeInd % 2 == 0))     // append RUs to BU shift vector
+            || ((m_type == RU) && (nodeInd % 2 == 1))) // append BUs to RU shift vector
+        {
+            if (hostname == "-1")   // mark dummies
+            {
+                m_shift.push_back(-1);
+            }
+            else
+            {
+                m_shift.push_back(rankId); 
+            }
+        }
+        nodeInd++;
     }
 }
 
 void Unit::ruShift(int idx)
 {
-    markDummies();
-    std::rotate(m_shift->begin(), m_shift->begin() + idx, m_shift->end());
+    parseConfig();
+    std::rotate(m_shift.begin(), m_shift.begin() + idx, m_shift.end());
 }
 
 void Unit::buShift(int idx)
 {
-    markDummies();
+    parseConfig();
 
-    std::vector<int> vec_r(m_shift->size());
-    std::copy(m_shift->rbegin(), m_shift->rend(), vec_r.begin());
+    std::vector<int> vec_r(m_shift.size());
+    std::copy(m_shift.rbegin(), m_shift.rend(), vec_r.begin());
 
-    std::copy(vec_r.begin(), vec_r.end(), m_shift->begin());
-    std::rotate(m_shift->begin(), m_shift->end() - 1 - idx, m_shift->end());
+    std::copy(vec_r.begin(), vec_r.end(), m_shift.begin());
+    std::rotate(m_shift.begin(), m_shift.end() - 1 - idx, m_shift.end());
 }
