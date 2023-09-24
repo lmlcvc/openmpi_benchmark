@@ -62,6 +62,7 @@ void ContinuousBenchmark::initUnitLists()
             if (m_rank == i)
             {
                 m_unit->setId(tmpInfo.id);
+                m_unit->setHostname(m_hostname);
                 m_unit->setBufferBytes(m_ruBufferBytes);
                 m_unit->setUnitType(UnitType::RU);
                 m_unit->ruShift(m_readoutUnits.size() - 1);
@@ -79,6 +80,7 @@ void ContinuousBenchmark::initUnitLists()
             if (m_rank == i)
             {
                 m_unit->setId(tmpInfo.id);
+                m_unit->setHostname(m_hostname);
                 m_unit->setBufferBytes(m_buBufferBytes);
                 m_unit->setUnitType(UnitType::BU);
                 m_unit->buShift(m_builderUnits.size() - 1);
@@ -231,8 +233,8 @@ void ContinuousBenchmark::performPeriodicalLogging()
     }
 }
 
-void ContinuousBenchmark::performPhaseLogging(std::string ruId, std::string buId, int phase,
-                                              double throughput, std::size_t errors, double averageRtt = -1)
+void ContinuousBenchmark::performPhaseLogging(std::string ruId, std::string buId, std::string ruHost, std::string buHost, int phase,
+                                              double throughput, double throughputBarrier, std::size_t errors, double averageRtt = -1)
 {
     // printing
     std::cout << std::fixed << std::setprecision(8);
@@ -244,6 +246,7 @@ void ContinuousBenchmark::performPhaseLogging(std::string ruId, std::string buId
         std::cout << " | " << std::setw(14) << " Avg. RTT";
 
     std::cout << " | " << std::setw(25) << "Throughput"
+              << " | " << std::setw(25) << "Throughput (w/ barrier)"
               << " | " << std::setw(10) << " Errors"
               << std::endl;
 
@@ -255,6 +258,7 @@ void ContinuousBenchmark::performPhaseLogging(std::string ruId, std::string buId
         std::cout << " | " << std::setw(12) << averageRtt << " s";
 
     std::cout << " | " << std::setw(18) << std::fixed << std::setprecision(2) << throughput << " Mbit/s"
+              << " | " << std::setw(18) << std::fixed << std::setprecision(2) << throughputBarrier << " Mbit/s"
               << " | " << std::setw(10) << errors << std::endl
               << std::endl;
 
@@ -265,7 +269,7 @@ void ContinuousBenchmark::performPhaseLogging(std::string ruId, std::string buId
         outputFile.seekp(0, std::ios::end);
         if (outputFile.tellp() == 0)
         {
-            outputFile << "timestamp,comm_type,message_size,phase,ru,bu,avg_rtt,throughput,errors\n"; // File is empty, add the header
+            outputFile << "timestamp,comm_type,message_size,message_count,phase,ru,bu,ru_host,bu_host,avg_rtt,throughput,throughput_with_barrier,errors\n";
         }
 
         std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
@@ -273,12 +277,16 @@ void ContinuousBenchmark::performPhaseLogging(std::string ruId, std::string buId
         outputFile << std::put_time(std::localtime(&now), "%Y-%m-%d %H:%M:%S") << ","
                    << communicationTypeToString(m_commType) << ","
                    << messageSizeToString(m_commType, m_messageSize) << ","
+                   << m_messagesPerPhase << ","
                    << phase << ","
                    << ruId << ","
-                   << buId << ",";
+                   << buId << ","
+                   << ruHost << ","
+                   << buHost << ",";
         if (m_commType == COMM_FIXED_BLOCKING || m_commType == COMM_FIXED_NONBLOCKING)
             outputFile << std::fixed << std::setprecision(8) << averageRtt;
         outputFile << "," << std::fixed << std::setprecision(1) << throughput << ","
+                   << "," << std::fixed << std::setprecision(1) << throughputBarrier << ","
                    << errors << "\n";
 
         outputFile.close();
@@ -293,7 +301,7 @@ void ContinuousBenchmark::handleAverageThroughput(std::size_t transferredSize, d
 {
     timespec lastAvgCalculationDiff = diff(m_lastAvgCalculationTime, endTime);
     double secsFromLastAvg = lastAvgCalculationDiff.tv_sec + (lastAvgCalculationDiff.tv_nsec / 1e9);
-    if (secsFromLastAvg >= m_lastAvgCalculationInterval) 
+    if (secsFromLastAvg >= m_lastAvgCalculationInterval)
     {
         if (m_rank == 0)
             performPeriodicalLogging();
@@ -335,14 +343,15 @@ void ContinuousBenchmark::handleAverageThroughput(std::size_t transferredSize, d
 void ContinuousBenchmark::run()
 {
     int ruRank, buRank;
-    std::string ruId, buId;
+    std::string ruId, buId, ruHost, buHost;
 
-    timespec startTime, endTime;
+    timespec startTime, startTimeBarrier, endTime;
 
     std::pair<std::size_t, std::size_t> result = std::make_pair(0, 0);
 
     for (int phase = 0; phase < m_nodesCount / 2; phase++)
     {
+        clock_gettime(CLOCK_MONOTONIC, &startTimeBarrier);
         MPI_Barrier(MPI_COMM_WORLD);
         if (m_rank == 0)
             std::cout << "\n\n============================================================\n\n"
@@ -352,22 +361,28 @@ void ContinuousBenchmark::run()
         {
             ruRank = m_rank;
             ruId = m_unit->getId();
+            ruHost = m_unit->getHostname();
+
             buRank = m_builderUnits.at(m_unit->getPair(phase)).rank;
-            buId = (buRank == -1) ? "DUMMY" : m_builderUnits.at(m_unit->getPair(phase)).id;
+            buId = (buRank == -1) ? "-1" : m_builderUnits.at(m_unit->getPair(phase)).id;
+            buHost = (buRank == -1) ? "DUMMY" : m_unit->getPairHost(m_unit->getPair(phase));
         }
         else if (m_unit->getUnitType() == UnitType::BU)
         {
             buRank = m_rank;
             buId = m_unit->getId();
+            buHost = m_unit->getHostname();
+
             ruRank = m_readoutUnits.at(m_unit->getPair(phase)).rank;
-            ruId = (ruRank == -1) ? "DUMMY" : m_readoutUnits.at(m_unit->getPair(phase)).id;
+            ruId = (ruRank == -1) ? "-1" : m_readoutUnits.at(m_unit->getPair(phase)).id;
+            ruHost = (ruRank == -1) ? "DUMMY" : m_unit->getPairHost(m_unit->getPair(phase));
         }
 
         // perform communication
         timespec elapsedTime;
         std::size_t errorMessageCount = 0;
         std::size_t transferredSize = 0;
-        double currentRunTimeDiff = 0.0;
+        double currentRunTimeDiff = 0.0, currentRunTimeDiffBarrier = 0.0;
         clock_gettime(CLOCK_MONOTONIC, &startTime);
 
         if (ruRank != -1 && buRank != -1) // skip communication involving dummy nodes
@@ -415,22 +430,27 @@ void ContinuousBenchmark::run()
         elapsedTime = diff(startTime, endTime);
         currentRunTimeDiff += (elapsedTime.tv_sec + (elapsedTime.tv_nsec / 1e9));
 
+        elapsedTime = diff(startTimeBarrier, endTime);
+        currentRunTimeDiffBarrier += (elapsedTime.tv_sec + (elapsedTime.tv_nsec / 1e9));
+
         if ((m_rank == buRank) || (buRank == -1))
         {
             if (ruRank == -1 || buRank == -1)
             {
-                performPhaseLogging(ruId, buId, phase, 0, 0);
+                performPhaseLogging(ruId, buId, ruHost, buHost, phase, 0, 0, 0);
             }
             else if (m_commType == COMM_VARIABLE_BLOCKING || m_commType == COMM_VARIABLE_NONBLOCKING)
             {
                 double avgThroughput = (transferredSize * 8.0) / (currentRunTimeDiff * 1e6);
-                performPhaseLogging(ruId, buId, phase, avgThroughput, errorMessageCount);
+                double avgThroughputBarrier = (transferredSize * 8.0) / (currentRunTimeDiffBarrier * 1e6);
+                performPhaseLogging(ruId, buId, ruHost, buHost, phase, avgThroughput, avgThroughputBarrier, errorMessageCount);
             }
             else if (m_commType == COMM_FIXED_BLOCKING || m_commType == COMM_FIXED_NONBLOCKING)
             {
                 double avgThroughput = (transferredSize * 8.0) / (currentRunTimeDiff * 1e6);
+                double avgThroughputBarrier = (transferredSize * 8.0) / (currentRunTimeDiffBarrier * 1e6);
                 double averageRtt = currentRunTimeDiff / (m_iterations * m_messagesPerPhase);
-                performPhaseLogging(ruId, buId, phase, avgThroughput, errorMessageCount, averageRtt);
+                performPhaseLogging(ruId, buId, ruHost, buHost, avgThroughput, avgThroughputBarrier, errorMessageCount, averageRtt);
             }
         }
 

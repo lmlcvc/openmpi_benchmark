@@ -62,6 +62,7 @@ protected:
     virtual void parseArguments(std::vector<ArgumentEntry> args) = 0;
 
     int m_rank;
+    std::string m_hostname;
 
     std::size_t m_iterations = 1e4;       // communication steps to be printed
     std::size_t m_warmupIterations = 100; // iteration count for warmup-related throughput calculation

@@ -1,9 +1,14 @@
 #include "fixed_message.h"
 
-BenchmarkFixedMessage::BenchmarkFixedMessage(std::vector<ArgumentEntry> args, int rank, int size, CommunicationType commType)
+BenchmarkFixedMessage::BenchmarkFixedMessage(std::vector<ArgumentEntry> args, CommunicationType commType)
 {
-    m_rank = rank;
-    m_nodesCount = size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &m_rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &m_nodesCount);
+
+    char hostname[32];
+    gethostname(hostname, sizeof(hostname));
+    m_hostname = hostname;
+
     m_commType = commType;
     m_messageSize = 1e5;
 

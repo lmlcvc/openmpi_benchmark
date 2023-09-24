@@ -6,7 +6,7 @@
 class ScanBenchmark : public Benchmark
 {
 public:
-    ScanBenchmark(std::vector<ArgumentEntry> args, int rank);
+    ScanBenchmark(std::vector<ArgumentEntry> args);
     virtual ~ScanBenchmark() override {}
 
     void run() override;

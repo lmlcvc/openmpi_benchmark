@@ -6,7 +6,7 @@
 class BenchmarkFixedMessage : public ContinuousBenchmark
 {
 public:
-    BenchmarkFixedMessage(std::vector<ArgumentEntry> args, int rank, int size, CommunicationType commType);
+    BenchmarkFixedMessage(std::vector<ArgumentEntry> args, CommunicationType commType);
     virtual ~BenchmarkFixedMessage() override {}
 
 private:

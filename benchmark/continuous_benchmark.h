@@ -20,8 +20,8 @@ public:
 
 protected:
     void initUnitLists();
-    void performPhaseLogging(std::string ruId, std::string buId, int phase,
-                             double throughput, std::size_t errors, double averageRtt);
+    void performPhaseLogging(std::string ruId, std::string buId, std::string ruHost, std::string buHost, int phase,  
+                             double throughput, double throughputBarrier, std::size_t errors, double averageRtt);
     void handleAverageThroughput(std::size_t transferredSize, double currentRunTimeDiff, timespec endTime);
     void performPeriodicalLogging();
 

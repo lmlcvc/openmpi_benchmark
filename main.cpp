@@ -214,6 +214,7 @@ const std::string createLogFilepath(std::string baseDirectory, int rank)
 int main(int argc, char **argv)
 {
     int rank, size;
+    char hostname[32];
     CommunicationType commType = COMM_UNDEFINED;
     std::vector<ArgumentEntry> commArguments;
 
@@ -225,26 +226,28 @@ int main(int argc, char **argv)
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
+    gethostname(hostname, sizeof(hostname));
+    std::string host_str(hostname);
 
     MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
 
-    std::cout << "Rank " << rank << " initialised" << std::endl;
+    std::cout << "Rank " << rank << " initialised on " << host_str << std::endl;
 
     // Benchmark object initialisation
     parseArguments(argc, argv, rank, commType, commArguments);
     if (commType == COMM_SCAN)
     {
-        benchmark = std::make_unique<ScanBenchmark>(commArguments, rank);
+        benchmark = std::make_unique<ScanBenchmark>(commArguments);
         continueRun = false;
     }
     else if (commType == COMM_FIXED_BLOCKING || commType == COMM_FIXED_NONBLOCKING)
     {
-        benchmark = std::make_unique<BenchmarkFixedMessage>(commArguments, rank, size, commType);
+        benchmark = std::make_unique<BenchmarkFixedMessage>(commArguments, commType);
     }
 
     else if (commType == COMM_VARIABLE_BLOCKING || commType == COMM_VARIABLE_NONBLOCKING)
     {
-        benchmark = std::make_unique<BenchmarkVariableMessage>(commArguments, rank, size, commType);
+        benchmark = std::make_unique<BenchmarkVariableMessage>(commArguments, commType);
     }
     else
     {

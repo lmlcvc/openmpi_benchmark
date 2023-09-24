@@ -1,19 +1,23 @@
 #include "scan_benchmark.h"
 
-ScanBenchmark::ScanBenchmark(std::vector<ArgumentEntry> args, int rank)
+ScanBenchmark::ScanBenchmark(std::vector<ArgumentEntry> args)
 {
     int size;
     MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &m_rank);
 
     if (size != 2)
     {
-        if (rank == 0)
+        if (m_rank == 0)
             std::cerr << "Scan benchmark requires exactly 2 processes. Exiting." << std::endl;
         MPI_Finalize();
         std::exit(1);
     }
 
-    m_rank = rank;
+    char hostname[32];
+    gethostname(hostname, sizeof(hostname));
+    m_hostname = hostname;
+
     parseArguments(args);
 
     m_sndBufferBytes = m_sndBufferSize * static_cast<std::size_t>(std::pow(2, m_maxPower));

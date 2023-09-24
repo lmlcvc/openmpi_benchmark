@@ -68,7 +68,7 @@ void Unit::parseConfig()
 
         // get host name
         std::string hostname = json.substr(valueStart, valueEnd - valueStart - 1);
-        hostname = sanitizeHostname(hostname);
+        hostname = sanitizeHostname(hostname);    
         index = valueEnd + 1;
 
         // get index
@@ -102,6 +102,7 @@ void Unit::parseConfig()
             else
             {
                 m_shift.push_back(rankId / 2);
+                m_hostnames[rankId / 2] = hostname;
             }
         }
         nodeInd++;
