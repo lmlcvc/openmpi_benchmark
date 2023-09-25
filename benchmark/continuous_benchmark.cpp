@@ -139,64 +139,131 @@ void ContinuousBenchmark::warmupCommunication(std::vector<std::pair<int, int>> s
 
 void ContinuousBenchmark::performWarmup()
 {
-    int buRank;
-    timespec startTime, endTime;
+    int ruRank, buRank;
+    timespec startTime, endTime, elapsedTime;
+
     double throughput;
-    const std::size_t bufferBytes = m_unit->getBufferBytes();
-    std::size_t messageSize = bufferBytes / 10;
+    double currentRunTimeDiff = 0.0;
+    std::pair<std::size_t, std::size_t> result = std::make_pair(0, 0);
+
+    std::size_t messageSize = m_ruBufferBytes / 10;
     std::size_t transferredSize = 0;
 
-    std::vector<std::pair<int, int>> subarrayIndices = findSubarrayIndices(bufferBytes);
+    std::vector<std::pair<int, int>> subarrayIndices = findSubarrayIndices(m_ruBufferBytes);
 
+    // pre-warmup test
     clock_gettime(CLOCK_MONOTONIC, &startTime);
-
-    for (int ruRank = 0; ruRank < m_nodesCount; ruRank++)
+    for (int phase = 0; phase < m_nodesCount / 2; phase++)
     {
-        buRank = (1 + ruRank) % m_nodesCount;
-        if (m_rank == ruRank || m_rank == buRank)
+        MPI_Barrier(MPI_COMM_WORLD);
+
+        if (m_unit->getUnitType() == UnitType::RU)
         {
-            std::pair<std::size_t, std::size_t> result = CommunicationInterface::blockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
-                                                                                                       messageSize, m_warmupIterations);
-            transferredSize += result.second;
+            ruRank = m_rank;
+            buRank = m_builderUnits.at(m_unit->getPair(phase)).rank;
+        }
+        else if (m_unit->getUnitType() == UnitType::BU)
+        {
+            buRank = m_rank;
+            ruRank = m_readoutUnits.at(m_unit->getPair(phase)).rank;
+        }
+
+        if (ruRank != -1 && buRank != -1)
+        {
+            result = CommunicationInterface::blockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
+                                                                   messageSize, m_warmupIterations);
+
+            // perform logging and reset result variable
+            if (m_rank == buRank)
+            {
+                transferredSize += result.second;
+                result = std::make_pair(0, 0);
+            }
+            else if (m_rank == ruRank)
+            {
+                result = std::make_pair(0, 0);
+            }
         }
     }
-
     clock_gettime(CLOCK_MONOTONIC, &endTime);
-    std::tie(std::ignore, throughput) = calculateThroughput(startTime, endTime, transferredSize, m_warmupIterations);
+    std::tie(std::ignore, throughput) = calculateThroughput(startTime, endTime, transferredSize, m_warmupIterations * (m_nodesCount / 2));
 
+    if (m_rank == buRank)
+        std::cout << "Avg. pre-warmup throughput: " << throughput << " Mbit/s" << std::endl; 
     if (m_rank == 0)
-        std::cout << "\nAvg. pre-warmup throughput: " << throughput << " Mbit/s" << std::endl
-                  << "Performing warmup...";
+        std::cout << "\n\nPerforming warmup...";
 
-    for (int ruRank = 0; ruRank < m_nodesCount; ruRank++)
+    ////////////////////
+
+    // perform warmup
+    for (int phase = 0; phase < m_nodesCount / 2; phase++)
     {
-        buRank = (1 + ruRank) % m_nodesCount;
-        if (m_rank == ruRank || m_rank == buRank)
-            warmupCommunication(subarrayIndices, ruRank, buRank);
+        MPI_Barrier(MPI_COMM_WORLD);
+
+        if (m_unit->getUnitType() == UnitType::RU)
+        {
+            ruRank = m_rank;
+            buRank = m_builderUnits.at(m_unit->getPair(phase)).rank;
+        }
+        else if (m_unit->getUnitType() == UnitType::BU)
+        {
+            buRank = m_rank;
+            ruRank = m_readoutUnits.at(m_unit->getPair(phase)).rank;
+        }
+
+        warmupCommunication(subarrayIndices, ruRank, buRank);
     }
 
     if (m_rank == 0)
-        std::cout << "Done." << std::endl;
+        std::cout << "Done.\n\n"
+                  << std::endl;
+
+    ////////////////////
 
     transferredSize = 0;
+    currentRunTimeDiff = 0;
     clock_gettime(CLOCK_MONOTONIC, &startTime);
 
-    for (int ruRank = 0; ruRank < m_nodesCount; ruRank++)
+    // post-warmup test
+
+    for (int phase = 0; phase < m_nodesCount / 2; phase++)
     {
-        buRank = (1 + ruRank) % m_nodesCount;
-        if (m_rank == ruRank || m_rank == buRank)
+        MPI_Barrier(MPI_COMM_WORLD);
+
+        if (m_unit->getUnitType() == UnitType::RU)
         {
-            std::pair<std::size_t, std::size_t> result = CommunicationInterface::blockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
-                                                                                                       messageSize, m_warmupIterations);
-            transferredSize += result.second;
+            ruRank = m_rank;
+            buRank = m_builderUnits.at(m_unit->getPair(phase)).rank;
+        }
+        else if (m_unit->getUnitType() == UnitType::BU)
+        {
+            buRank = m_rank;
+            ruRank = m_readoutUnits.at(m_unit->getPair(phase)).rank;
+        }
+
+        if (ruRank != -1 && buRank != -1)
+        {
+            result = CommunicationInterface::blockingCommunication(m_unit.get(), ruRank, buRank, m_rank,
+                                                                   messageSize, m_warmupIterations);
+
+            // perform logging and reset result variable
+            if (m_rank == buRank)
+            {
+                transferredSize += result.second;
+                result = std::make_pair(0, 0);
+            }
+            else if (m_rank == ruRank)
+            {
+                result = std::make_pair(0, 0);
+            }
         }
     }
     clock_gettime(CLOCK_MONOTONIC, &endTime);
 
-    std::tie(std::ignore, throughput) = calculateThroughput(startTime, endTime, transferredSize, m_warmupIterations);
+    std::tie(std::ignore, throughput) = calculateThroughput(startTime, endTime, transferredSize, m_warmupIterations* (m_nodesCount / 2));
 
-    if (m_rank == 0)
-        std::cout << "Avg. post-warmup throughput: " << throughput << " Mbit/s\n"
+    if (m_rank == buRank)
+        std::cout << "Avg. post-warmup throughput: " << throughput << " Mbit/s"
                   << std::endl;
 }
 
@@ -354,7 +421,7 @@ void ContinuousBenchmark::run()
         clock_gettime(CLOCK_MONOTONIC, &startTimeBarrier);
         MPI_Barrier(MPI_COMM_WORLD);
         if (m_rank == 0)
-            std::cout << "\n\n============================================================\n\n"
+            std::cout << "\n\n===========================================================================\n\n"
                       << std::endl;
 
         if (m_unit->getUnitType() == UnitType::RU)
@@ -422,16 +489,16 @@ void ContinuousBenchmark::run()
                 {
                     result = std::make_pair(0, 0);
                 }
+
+                clock_gettime(CLOCK_MONOTONIC, &endTime);
+
+                elapsedTime = diff(startTime, endTime);
+                currentRunTimeDiff += (elapsedTime.tv_sec + (elapsedTime.tv_nsec / 1e9));
+
+                elapsedTime = diff(startTimeBarrier, endTime);
+                currentRunTimeDiffBarrier += (elapsedTime.tv_sec + (elapsedTime.tv_nsec / 1e9));
             }
         }
-
-        clock_gettime(CLOCK_MONOTONIC, &endTime);
-
-        elapsedTime = diff(startTime, endTime);
-        currentRunTimeDiff += (elapsedTime.tv_sec + (elapsedTime.tv_nsec / 1e9));
-
-        elapsedTime = diff(startTimeBarrier, endTime);
-        currentRunTimeDiffBarrier += (elapsedTime.tv_sec + (elapsedTime.tv_nsec / 1e9));
 
         if ((m_rank == buRank) || (buRank == -1))
         {
@@ -450,10 +517,10 @@ void ContinuousBenchmark::run()
                 double avgThroughput = (transferredSize * 8.0) / (currentRunTimeDiff * 1e6);
                 double avgThroughputBarrier = (transferredSize * 8.0) / (currentRunTimeDiffBarrier * 1e6);
                 double averageRtt = currentRunTimeDiff / (m_iterations * m_messagesPerPhase);
-                performPhaseLogging(ruId, buId, ruHost, buHost, avgThroughput, avgThroughputBarrier, errorMessageCount, averageRtt);
+                performPhaseLogging(ruId, buId, ruHost, buHost, phase, avgThroughput, avgThroughputBarrier, errorMessageCount, averageRtt);
             }
         }
 
-        handleAverageThroughput(transferredSize, currentRunTimeDiff, endTime);
+        handleAverageThroughput(transferredSize, currentRunTimeDiffBarrier, endTime);
     }
 }
