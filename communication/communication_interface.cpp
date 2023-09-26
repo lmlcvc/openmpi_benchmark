@@ -97,9 +97,8 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::blockingCommunicatio
 }
 
 std::pair<std::size_t, std::size_t> CommunicationInterface::nonBlockingCommunication(Unit *unit, int ruRank, int buRank, int processRank,
-                                                                                     std::size_t messageSize, std::size_t iterations, std::size_t syncIterations)
+                                                                                     std::size_t messageSize, std::size_t iterations)
 {
-    syncIterations = iterations;
     std::vector<MPI_Request> sendRequests(iterations);
     std::vector<MPI_Request> recvRequests(iterations);
     std::vector<MPI_Status> statuses(iterations);
@@ -134,7 +133,7 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::nonBlockingCommunica
             if (recvOffset + messageSize > rcvBufferBytes)
                 recvOffset = 0;
 
-            MPI_Irecv(bufferRcv + recvOffset, messageSize, MPI_BYTE, ruRank, 0, MPI_COMM_WORLD, &recvRequests[i % syncIterations]);
+            MPI_Irecv(bufferRcv + recvOffset, messageSize, MPI_BYTE, ruRank, 0, MPI_COMM_WORLD, &recvRequests[i]);
 
             recvOffset = (recvOffset + messageSize) % rcvBufferBytes;
         }
@@ -218,7 +217,7 @@ std::pair<std::size_t, std::size_t> CommunicationInterface::variableBlockingComm
 }
 
 std::pair<std::size_t, std::size_t> CommunicationInterface::variableNonBlockingCommunication(Unit *unit, int ruRank, int buRank, int processRank,
-                                                                                             std::vector<std::size_t> messageSizes, std::size_t iterations, std::size_t syncIterations)
+                                                                                             std::vector<std::size_t> messageSizes, std::size_t iterations)
 {
     std::vector<MPI_Request> sendRequests(iterations);
     std::vector<MPI_Request> recvRequests(iterations);

@@ -21,13 +21,13 @@ public:
                                                               std::size_t messageSize, std::size_t iterations);
 
     std::pair<std::size_t, std::size_t> nonBlockingCommunication(Unit *unit, int ruRank, int buRank, int processRank,
-                                                                 std::size_t messageSize, std::size_t iterations, std::size_t syncIterations);
+                                                                 std::size_t messageSize, std::size_t iterations);
 
     std::pair<std::size_t, std::size_t> variableBlockingCommunication(Unit *unit, int ruRank, int buRank, int processRank,
                                                                       std::vector<std::size_t> messageSizes, std::size_t iterations);
 
     std::pair<std::size_t, std::size_t> variableNonBlockingCommunication(Unit *unit, int ruRank, int buRank, int processRank,
-                                                                         std::vector<std::size_t> messageSizes, std::size_t iterations, std::size_t syncIterations);
+                                                                         std::vector<std::size_t> messageSizes, std::size_t iterations);
 };
 
 #endif // COMMUNICATIONINTERFACE_H

@@ -15,8 +15,6 @@ BenchmarkVariableMessage::BenchmarkVariableMessage(std::vector<ArgumentEntry> ar
 
     BenchmarkVariableMessage::parseArguments(args);
 
-    m_syncIterations = m_iterations / 1e4;
-
     initUnitLists();
     m_unit->allocateMemory();
 

@@ -26,8 +26,6 @@ BenchmarkFixedMessage::BenchmarkFixedMessage(std::vector<ArgumentEntry> args, Co
     initUnitLists();
     m_unit->allocateMemory();
 
-    m_syncIterations = m_iterations / 1e4;
-
     if (m_rank == 0)
     {
         std::cout << std::endl

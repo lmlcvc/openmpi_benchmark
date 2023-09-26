@@ -31,7 +31,6 @@ protected:
     std::size_t m_messagesPerPhase = 1;
 
     const std::size_t minMessageSize = 1e4;
-    std::size_t m_syncIterations;
 
     int m_nodesCount;
     std::size_t m_currentPhase = 0;
