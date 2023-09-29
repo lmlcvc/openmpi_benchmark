@@ -94,9 +94,8 @@ def parse_file_lines(file_name, lines):
                     ret_val.append(Host_descr(host, device, len(ret_val)))
                 else:
                     ret_val.append(Host_descr("invalid", -1, -1))
-
             else:
-                ret_val.append(Host_descr("invalid", -1, -1))
+                pass
 
     return ret_val
 
@@ -234,6 +233,7 @@ def main():
 
     if (args.lines != ''):
         lines = parse_sequence(args.lines)
+        print(args.lines)
         hosts = parse_file_lines(args.fat_tree_file, lines)
     else:
         host_match = args.nodes.split(',')
@@ -253,6 +253,7 @@ def main():
             '};')
         print(
             f'// n_nodes {n_nodes} n_dummy {n_dummy} active fraction {n_nodes/(n_nodes+n_dummy)}')
+        # FIXME: doesn't print dummies
     
 
 if __name__ == "__main__":

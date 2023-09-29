@@ -55,7 +55,7 @@ public:
 
 protected:
     timespec diff(timespec start, timespec end);
-    std::vector<std::pair<int, int>> findSubarrayIndices(std::size_t messageSize);
+    std::vector<std::pair<int, int>> findSubarrayIndices(std::size_t bufferSize);
     std::pair<double, double> calculateThroughput(timespec startTime, timespec endTime, std::size_t bytesTransferred, std::size_t iterations);
 
     virtual void warmupCommunication(std::vector<std::pair<int, int>> subarrayIndices, int ruRank, int buRank) = 0;

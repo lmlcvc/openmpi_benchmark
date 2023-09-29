@@ -16,10 +16,16 @@ timespec Benchmark::diff(timespec start, timespec end)
     return time_diff;
 }
 
-std::vector<std::pair<int, int>> Benchmark::findSubarrayIndices(std::size_t messageSize)
+/**
+ * @brief Find subarrays of buffer (for warmup)
+ * 
+ * @param bufferSize Size of communication's send buffer
+ * @return std::vector<std::pair<int, int>> Start and end points of subarrays
+ */
+std::vector<std::pair<int, int>> Benchmark::findSubarrayIndices(std::size_t bufferSize)
 {
-    int subarraySize = std::ceil(0.32 * messageSize);
-    int sharedElements = std::ceil(0.15 * messageSize);
+    int subarraySize = std::ceil(0.32 * bufferSize);
+    int sharedElements = std::ceil(0.15 * bufferSize);
 
     std::vector<std::pair<int, int>> subarrayIndices;
 

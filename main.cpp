@@ -1,6 +1,5 @@
 #include <iostream>
 #include <cstddef>
-#include <csignal>
 #include <vector>
 #include <string>
 #include <memory>
@@ -17,14 +16,6 @@
 #include "benchmark/variable_message.h"
 #include "benchmark/fixed_message.h"
 
-volatile sig_atomic_t sigintReceived = 0;
-
-void handleSignals(int signal)
-{
-    if (signal == SIGINT)
-        sigintReceived = 1;
-}
-
 void printHelp()
 {
     std::cout << "Modes of Operation:\n";
@@ -34,31 +25,31 @@ void printHelp()
     std::cout << "  Use non-blocking mode (-n).\n\n";
 
     std::cout << "  SCAN RUN:\n";
-    std::cout << "    -p <max power>           Set the maximum power of 2 for message sizes.\n";
-    std::cout << "    -i <iterations>          Specify the number of iterations.\n";
-    std::cout << "    -b <send buffer size>    Set the size of the send buffer in messages.\n";
-    std::cout << "    -r <receive buffer size> Set the size of the receive buffer in messages.\n";
-    std::cout << "    -w <warmup iterations>   Set the number of warmup iterations.\n\n";
+    std::cout << "    <max power>           Set the maximum power of 2 for message sizes.\n";
+    std::cout << "    <iterations>          Specify the number of iterations.\n";
+    std::cout << "    <send buffer size>    Set the size of the send buffer in messages.\n";
+    std::cout << "    <receive buffer size> Set the size of the receive buffer in messages.\n";
+    std::cout << "    <warmup iterations>   Set the number of warmup iterations.\n\n";
 
     std::cout << "  FIXED MESSAGE SIZE RUN:\n";
-    std::cout << "    -m <message size>        Set the fixed message size.\n";
-    std::cout << "    -p <msgs per phase>      Set the number of messages in each phase.\n";
-    std::cout << "    -i <iterations>          Specify the number of iterations.\n";
-    std::cout << "    -r <RU buffer bytes>     Set the size of the send buffer in bytes.\n";
-    std::cout << "    -b <BU buffer bytes>     Set the size of the receive buffer in bytes.\n";
-    std::cout << "    -w <warmup iterations>   Set the number of warmup iterations.\n";
-    std::cout << "    -l <logging interval>    Set the interval for average throughput logging in seconds.\n";
-    std::cout << "    -c <config path>         Configuration json with info on the hosts.\n\n";
+    std::cout << "    <message size>        Set the fixed message size.\n";
+    std::cout << "    <msgs per phase>      Set the number of messages in each phase.\n";
+    std::cout << "    <iterations>          Specify the number of iterations.\n";
+    std::cout << "    <RU buffer bytes>     Set the size of the send buffer in bytes.\n";
+    std::cout << "    <BU buffer bytes>     Set the size of the receive buffer in bytes.\n";
+    std::cout << "    <warmup iterations>   Set the number of warmup iterations.\n";
+    std::cout << "    <logging interval>    Set the interval for average throughput logging in seconds.\n";
+    std::cout << "    <config path>         Configuration json with info on the hosts.\n\n";
 
     std::cout << "  VARIABLE MESSAGE SIZE RUN:\n";
-    std::cout << "    -m <message size variants> Set the number of message size variants.\n";
-    std::cout << "    -p <msgs per phase>        Set the number of messages in each phase.\n";
-    std::cout << "    -i <iterations>            Specify the number of iterations.\n";
-    std::cout << "    -r <RU buffer bytes>       Set the size of the send buffer in bytes.\n";
-    std::cout << "    -b <BU buffer bytes>       Set the size of the receive buffer in bytes.\n";
-    std::cout << "    -w <warmup iterations>     Set the number of warmup iterations.\n";
-    std::cout << "    -l <logging interval>      Set the interval for average throughput logging in seconds.\n";
-    std::cout << "    -c <config path>           Configuration json with info on the hosts.\n\n";
+    std::cout << "    <message size variants> Set the number of message size variants.\n";
+    std::cout << "    <msgs per phase>        Set the number of messages in each phase.\n";
+    std::cout << "    <iterations>            Specify the number of iterations.\n";
+    std::cout << "    <RU buffer bytes>       Set the size of the send buffer in bytes.\n";
+    std::cout << "    <BU buffer bytes>       Set the size of the receive buffer in bytes.\n";
+    std::cout << "    <warmup iterations>     Set the number of warmup iterations.\n";
+    std::cout << "    <logging interval>      Set the interval for average throughput logging in seconds.\n";
+    std::cout << "    <config path>           Configuration json with info on the hosts.\n\n";
 }
 
 timespec diff(timespec start, timespec end)
@@ -77,16 +68,34 @@ timespec diff(timespec start, timespec end)
     return time_diff;
 }
 
-void printElapsed(timespec runStartTime)
+std::string getCurrentDate()
 {
-    timespec runEndTime;
-    clock_gettime(CLOCK_MONOTONIC, &runEndTime);
-    timespec elapsedTime = diff(runStartTime, runEndTime);
-    double elapsedSeconds = elapsedTime.tv_sec + (elapsedTime.tv_nsec / 1e9);
+    std::time_t t = std::time(nullptr);
+    std::tm tm = *std::localtime(&t);
 
-    std::cout << "Finishing program. Total elapsed time: " << elapsedSeconds << " s" << std::endl;
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "%Y-%m-%d");
+    return oss.str();
 }
 
+bool directoryExists(const std::string &path)
+{
+    struct stat info;
+    return stat(path.c_str(), &info) == 0 && S_ISDIR(info.st_mode);
+}
+
+/**
+ * @brief Run arguments parsing for benchmark initialisation.
+ *
+ * Parses benchmark type-related arguments, pushes the rest to be parsed in benchmark object.
+ *
+ * @param argc
+ * @param argv
+ * @param rank Process rank (for printing)
+ * @param commType Type of benchmark run
+ * @param commArguments Args not related to benchmark type, passed to benchmark obj for parsing
+ *
+ */
 void parseArguments(int argc, char **argv, int rank, CommunicationType &commType, std::vector<ArgumentEntry> &commArguments)
 {
     int opt;
@@ -163,22 +172,15 @@ void parseArguments(int argc, char **argv, int rank, CommunicationType &commType
     }
 }
 
-std::string getCurrentDate()
-{
-    std::time_t t = std::time(nullptr);
-    std::tm tm = *std::localtime(&t);
-
-    std::ostringstream oss;
-    oss << std::put_time(&tm, "%Y-%m-%d");
-    return oss.str();
-}
-
-bool directoryExists(const std::string &path)
-{
-    struct stat info;
-    return stat(path.c_str(), &info) == 0 && S_ISDIR(info.st_mode);
-}
-
+/**
+ * @brief Create path for log file
+ *
+ * Initialises base directory and date-related log file within it (if needed).
+ *
+ * @param baseDirectory Directory indicating type of log
+ * @param rank Process rank (can only be created by one process)
+ * @return const std::string logFilepath
+ */
 const std::string createLogFilepath(std::string baseDirectory, int rank)
 {
     std::string parentDirectory = "logs";
@@ -223,6 +225,7 @@ int main(int argc, char **argv)
     bool continueRun = true;
     timespec runStartTime;
 
+    // MPI setup
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
@@ -260,27 +263,15 @@ int main(int argc, char **argv)
     benchmark->setPhasesFilepath(createLogFilepath("phases", rank));
     benchmark->setAvgThroughputFilepath(createLogFilepath("avg_throughput", rank));
 
-    std::signal(SIGINT, [](int signal)
-                { handleSignals(signal); });
-
     // Run program
     clock_gettime(CLOCK_MONOTONIC, &runStartTime);
-    benchmark->performWarmup(); // FIXME: ineffective
+    benchmark->performWarmup();
 
     do
     {
         benchmark->run();
-
-        if (sigintReceived)
-        {
-            if (rank == 0)
-                printElapsed(runStartTime);
-            MPI_Finalize();
-            std::exit(EXIT_SUCCESS);
-        }
     } while (continueRun);
 
-    // Finalise program
     MPI_Finalize();
 
     return 0;

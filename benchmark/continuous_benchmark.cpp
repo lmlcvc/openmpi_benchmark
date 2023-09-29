@@ -319,7 +319,7 @@ void ContinuousBenchmark::performPhaseLogging(std::string ruId, std::string buId
                    << buHost << ",";
         if (m_commType == COMM_FIXED_BLOCKING || m_commType == COMM_FIXED_NONBLOCKING)
             outputFile << std::fixed << std::setprecision(8) << averageRtt;
-        outputFile << "," << std::fixed << std::setprecision(1) << throughput << ","
+        outputFile << "," << std::fixed << std::setprecision(1) << throughput
                    << "," << std::fixed << std::setprecision(1) << throughputBarrier << ","
                    << errors << "\n";
 
@@ -451,28 +451,24 @@ void ContinuousBenchmark::run()
         std::size_t errorMessageCount = 0;
         std::size_t transferredSize = 0;
         double currentRunTimeDiff = 0.0, currentRunTimeDiffBarrier = 0.0;
-        clock_gettime(CLOCK_MONOTONIC, &startTime);
 
         if (ruRank != -1 && buRank != -1) // skip communication involving dummy nodes
         {
             for (int message = 0; message < m_messagesPerPhase; message++)
             {
+                clock_gettime(CLOCK_MONOTONIC, &startTime);
+
                 if (m_commType == COMM_FIXED_BLOCKING)
-                {
                     result = CommunicationInterface::blockingCommunication(m_unit.get(), ruRank, buRank, m_rank, m_messageSize, m_iterations);
-                }
+
                 else if (m_commType == COMM_FIXED_NONBLOCKING)
-                {
                     result = CommunicationInterface::nonBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank, m_messageSize, m_iterations);
-                }
+
                 else if (m_commType == COMM_VARIABLE_BLOCKING)
-                {
                     result = CommunicationInterface::variableBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank, m_messageSizes, m_iterations);
-                }
+
                 else if (m_commType == COMM_VARIABLE_NONBLOCKING)
-                {
                     result = CommunicationInterface::variableNonBlockingCommunication(m_unit.get(), ruRank, buRank, m_rank, m_messageSizes, m_iterations);
-                }
 
                 // perform logging and reset result variable
                 if (m_rank == buRank)
@@ -491,10 +487,12 @@ void ContinuousBenchmark::run()
 
                 elapsedTime = diff(startTime, endTime);
                 currentRunTimeDiff += (elapsedTime.tv_sec + (elapsedTime.tv_nsec / 1e9));
-
-                elapsedTime = diff(startTimeBarrier, endTime);
-                currentRunTimeDiffBarrier += (elapsedTime.tv_sec + (elapsedTime.tv_nsec / 1e9));
             }
+
+            clock_gettime(CLOCK_MONOTONIC, &endTime);
+
+            elapsedTime = diff(startTimeBarrier, endTime);
+            currentRunTimeDiffBarrier = (elapsedTime.tv_sec + (elapsedTime.tv_nsec / 1e9));
         }
 
         if ((m_rank == buRank) || (buRank == -1))

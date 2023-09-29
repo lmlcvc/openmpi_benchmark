@@ -16,7 +16,6 @@ mpi_binding_options = 'hwloc-bind --membind --cpubind os='
 
 def signal_handler(sig, frame):
     print('Caught SIGINT. Exiting...')
-    # TODO: print total runtime etc
     kill_exit = 0
     sys.exit(kill_exit)
 
@@ -110,6 +109,8 @@ def start_run(host_list, config, mode, messages_per_phase=None,
         mpi_command.extend(shlex.split(f"{mpi_binding_options}{network_device}"))
         mpi_command.extend(bu_commands)
         mpi_command.append(":")
+
+    print(" ".join(mpi_command))
 
     return subprocess.Popen(mpi_command, stderr=subprocess.PIPE, shell=False)
 
